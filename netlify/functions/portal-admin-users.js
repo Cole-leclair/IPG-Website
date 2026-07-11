@@ -4,8 +4,9 @@
 // =====================================================================
 //
 //   GET  /portal-admin-users            -> list client logins (invited + active)
-//   POST /portal-admin-users            -> invite a client   { email, bindlyClientId, accountType, name? }
-//   POST /portal-admin-users {action:'resend', id, email, bindlyClientId, accountType, name?}
+//   POST /portal-admin-users {action:'lookup', email} -> find Bindly client(s) matching an email
+//   POST /portal-admin-users            -> invite a client   { email, bindlyClientId, name? }
+//   POST /portal-admin-users {action:'resend', id, email, bindlyClientId, name?}
 //   POST /portal-admin-users {action:'revoke', id}
 //
 // STAFF-ONLY. Every path goes through auth.verifyStaff (role ∈ staff|admin),
@@ -17,12 +18,16 @@
 // portal_users + invitations (ARCHITECTURE.md §3) for richer columns and to
 // join Bindly data — but keep Clerk as the identity source of truth.
 //
-// TODO(Bindly): auto-detect the client from the email. When Bindly's
-// "look up client by email" lands (ARCHITECTURE.md §9 q2), the invite POST can
-// resolve bindlyClientId + accountType server-side from `email` instead of
-// trusting what the browser sends — and reject if no Bindly client matches.
+// BINDLY AUTO-DETECT (2026-07-11): staff no longer type a Bindly client id or
+// account type. `action:'lookup'` calls bindly.lookupClient(email) so the
+// browser can show the matching Bindly record(s) to confirm. The invite/resend
+// POST still only accepts a `bindlyClientId` as a SELECTION — verifyBindlyClient()
+// below re-runs the Bindly lookup server-side and rejects the request unless
+// that id is actually one of the matches for the given email, so the browser
+// can never just make up a client id or account type.
 var auth = require("./utils/auth");
 var clerk = require("./utils/clerk");
+var bindly = require("./utils/bindly");
 var respond = require("./utils/respond");
 var audit = require("./utils/audit");
 
@@ -87,12 +92,25 @@ async function listRows() {
 function cleanInvite(input) {
   var email = String(input.email == null ? "" : input.email).trim();
   var client = String(input.bindlyClientId == null ? "" : input.bindlyClientId).trim();
-  var type = String(input.accountType == null ? "" : input.accountType).trim();
   var name = String(input.name == null ? "" : input.name).trim().slice(0, 120);
   if (!EMAIL_RE.test(email)) return { error: "a valid client email is required" };
-  if (!client) return { error: "the Bindly client id is required" };
-  if (type !== "personal" && type !== "commercial") return { error: "account type must be personal or commercial" };
-  return { data: { email: email, client: client, type: type, name: name } };
+  if (!client) return { error: "no Bindly client selected — look up the client by email first" };
+  return { data: { email: email, client: client, name: name } };
+}
+
+// Re-derives account type (and Bindly's name on file) from Bindly itself,
+// rather than trusting whatever the browser sent — the browser only ever
+// gets to SELECT which lookup match it means, never invent the client id
+// or its type. Returns { type, bindlyName } or { error }.
+async function verifyBindlyClient(email, clientId) {
+  if (!bindly.configured()) return { error: "Bindly portal API isn't configured yet" };
+  var found;
+  try { found = await bindly.lookupClient(email); }
+  catch (e) { return { error: "couldn't verify this client with Bindly: " + e.message }; }
+  var list = (found && found.clients) || [];
+  var match = list.filter(function (c) { return String(c.client_id) === clientId; })[0];
+  if (!match) return { error: "that client no longer matches a Bindly record for this email — look it up again" };
+  return { type: match.type === "commercial" ? "commercial" : "personal", bindlyName: match.name || "" };
 }
 
 function metaFor(v) {
@@ -141,6 +159,16 @@ exports.handler = async function (event) {
       return respond.json(403, { error: "only admins can add or manage team members" });
     }
 
+    if (action === "lookup") {
+      var lkEmail = String(body.email == null ? "" : body.email).trim();
+      if (!EMAIL_RE.test(lkEmail)) return respond.json(400, { error: "a valid email is required" });
+      if (!bindly.configured()) return respond.json(501, { error: "Bindly portal API isn't configured yet" });
+      var lkFound;
+      try { lkFound = await bindly.lookupClient(lkEmail); }
+      catch (e0) { return respond.json(e0.status || 502, { error: e0.message }); }
+      return respond.json(200, { clients: (lkFound && lkFound.clients) || [] });
+    }
+
     if (action === "revoke") {
       if (!body.id) return respond.json(400, { error: "id is required" });
       await clerk.revokeInvitation(body.id);
@@ -178,6 +206,10 @@ exports.handler = async function (event) {
       }
       var checkedR = cleanInvite(body);
       if (checkedR.error) return respond.json(400, { error: checkedR.error });
+      var verifiedR = await verifyBindlyClient(checkedR.data.email, checkedR.data.client);
+      if (verifiedR.error) return respond.json(400, { error: verifiedR.error });
+      checkedR.data.type = verifiedR.type;
+      if (!checkedR.data.name) checkedR.data.name = verifiedR.bindlyName;
       if (body.id) { try { await clerk.revokeInvitation(body.id); } catch (ignore) { /* already gone */ } }
       var reInv = await clerk.createInvitation(checkedR.data.email, metaFor(checkedR.data), redirectUrl);
       audit.log({ action: "invite_resent", actor: staff.authUserId, target: reInv && reInv.id, bindlyClientId: checkedR.data.client });
@@ -194,6 +226,10 @@ exports.handler = async function (event) {
     }
     var checked = cleanInvite(body);
     if (checked.error) return respond.json(400, { error: checked.error });
+    var verified = await verifyBindlyClient(checked.data.email, checked.data.client);
+    if (verified.error) return respond.json(400, { error: verified.error });
+    checked.data.type = verified.type;
+    if (!checked.data.name) checked.data.name = verified.bindlyName;
     var inv = await clerk.createInvitation(checked.data.email, metaFor(checked.data), redirectUrl);
     audit.log({ action: "invite_created", actor: staff.authUserId, target: inv && inv.id, bindlyClientId: checked.data.client });
     return respond.json(201, { ok: true, user: inviteToRow(inv) });

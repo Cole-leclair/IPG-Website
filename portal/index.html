@@ -286,24 +286,27 @@
     <div class="ptab-panel" data-panel="admin" hidden>
       <div class="portal-panel">
         <h2>Add a client login</h2>
-        <p class="portal-note" style="margin:0 0 16px;">Create a portal login for a client. They&rsquo;ll get an email to set their own password &mdash; nothing to hand over. <span id="ivBindlyHint">Enter the client&rsquo;s Bindly ID for now; once Bindly&rsquo;s email lookup is connected, we&rsquo;ll auto-detect it from the email.</span></p>
+        <p class="portal-note" style="margin:0 0 16px;">Create a portal login for a client. They&rsquo;ll get an email to set their own password &mdash; nothing to hand over. Enter their email and we&rsquo;ll look them up in Bindly automatically.</p>
 
-        <!-- Step 1: details -->
+        <!-- Step 1: email -->
         <form id="inviteForm" novalidate>
           <div class="form-grid">
             <div class="form-field"><label for="ivEmail">Client email</label><input id="ivEmail" type="email" maxlength="254" autocomplete="off" required></div>
-            <div class="form-field"><label for="ivName">Name <span class="lbl-hint">(optional)</span></label><input id="ivName" type="text" maxlength="120"></div>
-            <div class="form-field"><label for="ivClient">Bindly client ID</label><input id="ivClient" type="text" maxlength="120" required></div>
-            <div class="form-field"><label for="ivType">Account type</label>
-              <select id="ivType" required>
-                <option value="personal">Personal</option>
-                <option value="commercial">Commercial</option>
-              </select>
-            </div>
+            <div class="form-field"><label for="ivName">Name <span class="lbl-hint">(optional override)</span></label><input id="ivName" type="text" maxlength="120"></div>
           </div>
-          <button class="btn btn-primary btn-sm" type="submit">Review &amp; send invite</button>
+          <button class="btn btn-primary btn-sm" type="submit">Look up client</button>
           <p class="portal-msg" id="inviteMsg" aria-live="polite"></p>
         </form>
+
+        <!-- Step 1b: Bindly found more than one match for this email — pick one -->
+        <div id="inviteMatches" class="invite-confirm" hidden>
+          <h3>Select the right client</h3>
+          <p class="portal-note" style="margin:0 0 14px;">Bindly found more than one match for this email.</p>
+          <ul class="doc-list" id="inviteMatchesList"></ul>
+          <div class="invite-confirm-actions">
+            <button class="btn btn-outline btn-sm" type="button" id="inviteMatchesBackBtn">Back</button>
+          </div>
+        </div>
 
         <!-- Step 2: confirm the client before the invite goes out -->
         <div id="inviteConfirm" class="invite-confirm" hidden>
@@ -371,6 +374,6 @@
   </main>
 </div>
 
-<script src="portal.js?v=23"></script>
+<script src="portal.js?v=24"></script>
 </body>
 </html>

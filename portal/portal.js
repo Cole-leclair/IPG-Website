@@ -279,6 +279,15 @@
     { id: "t-2", email: "meagan@ipg.team", name: "Meagan Reyes", role: "staff", status: "active", created: "2026-07-05" },
     { id: "t-3", email: "newhire@ipg.team", name: "Jamie Park", role: "staff", status: "invited", created: "2026-07-11" }
   ];
+  // Stand-in for Bindly's client directory, so the "look up by email" flow is
+  // fully demoable without a backend. One email maps to two clients on purpose
+  // (a shared household inbox) to exercise the "pick a match" step too.
+  var MOCK_BINDLY_DIRECTORY = [
+    { client_id: "BND-10234", name: "Acme Roofing LLC", email: "maria@acmeroofing.com", phone: "555-0134", type: "commercial" },
+    { client_id: "BND-10891", name: "Jordan Rivera", email: "jordan.rivera@example.com", phone: "555-0198", type: "personal" },
+    { client_id: "BND-20001", name: "Rivera Household (Personal)", email: "family@example.com", phone: "555-0177", type: "personal" },
+    { client_id: "BND-20002", name: "Rivera Rentals LLC", email: "family@example.com", phone: "555-0177", type: "commercial" }
+  ];
 
   // Attach the signed-in user's Clerk token to every backend call so the server
   // can verify WHO is asking (and re-derive their client id / role) — never
@@ -312,6 +321,16 @@
     load: function () {
       if (adminPreview) return Promise.resolve({ users: MOCK_ADMIN_USERS.slice(), team: MOCK_ADMIN_TEAM.slice() });
       return authedApi("/portal-admin-users").then(function (b) { return { users: b.users || [], team: b.team || [] }; });
+    },
+    // Find the Bindly client(s) matching an email — the seam the invite form
+    // uses instead of asking staff to type a Bindly client id by hand.
+    lookupClient: function (email) {
+      if (adminPreview) {
+        var q = String(email || "").trim().toLowerCase();
+        var matches = MOCK_BINDLY_DIRECTORY.filter(function (c) { return c.email.toLowerCase() === q; });
+        return Promise.resolve({ clients: matches });
+      }
+      return authedApi("/portal-admin-users", { method: "POST", body: { action: "lookup", email: email } });
     },
     invite: function (data) {
       if (adminPreview) {
@@ -767,8 +786,14 @@
   function initInviteForm() {
     var form = $("inviteForm");
     if (!form) return;
+    var matchesBox = $("inviteMatches");
     var confirmBox = $("inviteConfirm");
-    var pending = null;
+    var nameOverride = ""; // what staff typed in the optional Name field, if anything
+    var pending = null;    // { email, name, bindlyClientId, accountType } once a match is chosen
+
+    function resetToForm() {
+      matchesBox.hidden = true; confirmBox.hidden = true; form.hidden = false;
+    }
 
     function renderConfirm(p) {
       var rows = [["Email", p.email]];
@@ -780,28 +805,62 @@
       $("inviteConfirmMsg").textContent = "";
     }
 
+    function chooseMatch(email, match) {
+      pending = {
+        email: email,
+        name: nameOverride || match.name || "",
+        bindlyClientId: match.client_id,
+        accountType: match.type === "commercial" ? "commercial" : "personal"
+      };
+      renderConfirm(pending);
+      matchesBox.hidden = true; form.hidden = true; confirmBox.hidden = false;
+    }
+
+    function renderMatches(email, clients) {
+      $("inviteMatchesList").innerHTML = clients.map(function (c, i) {
+        var bits = [cap(c.type === "commercial" ? "commercial" : "personal"), "Bindly " + c.client_id].filter(Boolean);
+        return '<li><span class="doc-ico">' + PERSON_ICON + '</span>' +
+          '<span class="doc-meta"><span class="n">' + esc(c.name || email) + '</span>' +
+          '<span class="m">' + esc(bits.join(" · ")) + '</span></span>' +
+          '<span class="contact-actions"><a href="#" class="doc-dl" data-pick-match="' + i + '">Select</a></span></li>';
+      }).join("");
+      $("inviteMatchesList").onclick = function (e) {
+        var a = e.target && e.target.closest ? e.target.closest("[data-pick-match]") : null;
+        if (!a) return;
+        e.preventDefault();
+        chooseMatch(email, clients[Number(a.getAttribute("data-pick-match"))]);
+      };
+      form.hidden = true; matchesBox.hidden = false;
+    }
+
     form.addEventListener("submit", function (e) {
       e.preventDefault();
       var msg = $("inviteMsg"); msg.className = "portal-msg"; msg.textContent = "";
       if (!form.checkValidity()) { form.reportValidity(); return; }
-      pending = {
-        email: $("ivEmail").value.trim(),
-        name: $("ivName").value.trim(),
-        bindlyClientId: $("ivClient").value.trim(),
-        accountType: $("ivType").value === "commercial" ? "commercial" : "personal"
-      };
-      // TODO(Bindly): when "look up client by email" is available (ARCHITECTURE
-      // §9 q2), call it here and show the MATCHED Bindly client (name/address)
-      // for confirmation instead of just echoing the typed id. This confirm
-      // step is the seam where that check lands.
-      renderConfirm(pending);
-      form.hidden = true;
-      confirmBox.hidden = false;
+      var email = $("ivEmail").value.trim();
+      nameOverride = $("ivName").value.trim();
+      var btn = form.querySelector('button[type="submit"]');
+      btn.disabled = true; msg.textContent = "Looking up this client in Bindly…";
+      AdminData.lookupClient(email).then(function (res) {
+        var clients = (res && res.clients) || [];
+        if (clients.length === 0) {
+          msg.className = "portal-msg err";
+          msg.textContent = "No Bindly client found for that email. Double-check it, or confirm which email is on file with the client.";
+        } else if (clients.length === 1) {
+          msg.textContent = "";
+          chooseMatch(email, clients[0]);
+        } else {
+          msg.textContent = "";
+          renderMatches(email, clients);
+        }
+      }).catch(function (err) {
+        msg.className = "portal-msg err";
+        msg.textContent = err && err.message ? err.message : "Couldn’t look up this client — try again.";
+      }).finally(function () { btn.disabled = false; });
     });
 
-    $("inviteBackBtn").addEventListener("click", function () {
-      confirmBox.hidden = true; form.hidden = false;
-    });
+    $("inviteMatchesBackBtn").addEventListener("click", resetToForm);
+    $("inviteBackBtn").addEventListener("click", resetToForm);
 
     $("inviteSendBtn").addEventListener("click", function () {
       if (!pending) return;
@@ -809,7 +868,7 @@
       var btn = $("inviteSendBtn"); btn.disabled = true;
       AdminData.invite(pending).then(function (res) {
         if (res && res.ok) {
-          confirmBox.hidden = true; form.hidden = false; form.reset();
+          resetToForm(); form.reset();
           var msg = $("inviteMsg"); msg.className = "portal-msg ok";
           msg.textContent = "Invite sent to " + pending.email + ". They’ll get an email to set their password.";
           pending = null;
