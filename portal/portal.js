@@ -33,7 +33,7 @@
   // =====================================================================
   var PORTAL_CONFIG = {
     // Clerk publishable key (public — safe to expose in client code).
-    clerkPublishableKey: "pk_test_ZXhjaXRpbmctb3lzdGVyLTc1LmNsZXJrLmFjY291bnRzLmRldiQ",
+    clerkPublishableKey: "pk_live_Y2xlcmsuaXBnLnRlYW0k",
     // Base path for the portal API (Netlify functions). Used in Phase 2 when
     // the PortalData getters below start calling real endpoints.
     apiBase: "/.netlify/functions"
