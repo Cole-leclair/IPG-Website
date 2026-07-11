@@ -1,0 +1,31 @@
+# Netlify site configuration for ipg.team
+# (Drag-and-drop deploys read this file from the site folder.)
+
+[build]
+  publish = "."
+  functions = "netlify/functions"
+
+[functions]
+  node_bundler = "esbuild"
+
+# Security headers, site-wide (see portal/ARCHITECTURE.md §7).
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains"
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "SAMEORIGIN"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+
+# Make browsers revalidate CSS/JS on every load so a deploy never shows
+# stale styles against fresh HTML (fast 304 when unchanged).
+[[headers]]
+  for = "/assets/styles.css"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/assets/app.js"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"

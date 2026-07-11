@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#2B5EA7">
+<!-- Hidden work-in-progress: keep it out of search engines -->
+<meta name="robots" content="noindex, nofollow">
+<title>IPG Client Portal</title>
+<link rel="icon" type="image/png" href="../assets/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap">
+<!-- Shares the main site's design so it stays in sync automatically -->
+<link rel="stylesheet" href="../assets/styles.css">
+<style>
+  /* hidden must beat class display rules (.portal-auth is display:flex) */
+  [hidden] { display: none !important; }
+  :root { --flag-h: 30px; }
+  /* keep all content clear of the fixed preview flag */
+  body { padding-top: var(--flag-h); }
+  .portal-flag { position: fixed; top: 0; left: 0; right: 0; background: var(--honey, #C98A2B); color: #fff; text-align: center; font-size: 12.5px; font-weight: 600; padding: 6px 12px; z-index: 100; letter-spacing: .02em; }
+  /* ---- Login ---- */
+  .portal-auth { min-height: calc(100vh - var(--flag-h)); display: flex; align-items: center; justify-content: center; padding: 48px 20px; }
+  .portal-card { width: 100%; max-width: 420px; background: var(--white); border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow-card); padding: 40px 34px; text-align: center; }
+  .portal-card .logo-img { height: 66px; margin: 0 auto 18px; }
+  .portal-card h1 { font-size: 26px; margin: 0 0 8px; }
+  .portal-sub { color: var(--slate); font-size: 14.5px; margin: 0 0 26px; }
+  .portal-card form { text-align: left; }
+  .portal-card .form-field { margin-bottom: 16px; }
+  .portal-card .btn-primary { width: 100%; justify-content: center; margin-top: 4px; }
+  #previewEntry .btn { width: 100%; justify-content: center; }
+  #previewEntry .btn + .btn { margin-top: 10px; }
+  .portal-help { font-size: 13px; color: var(--slate); margin: 22px 0 0; line-height: 1.6; }
+  .portal-msg { font-size: 13px; margin: 12px 0 0; min-height: 1em; }
+  .portal-msg.err { color: #b23b3b; }
+  .portal-msg.ok { color: #1e7a3d; }
+  /* ---- Chrome ---- */
+  .portal-header { position: sticky; top: var(--flag-h); z-index: 40; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 32px; background: rgba(244,246,250,0.92); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
+  .portal-header .logo-img { height: 50px; }
+  .portal-user { display: flex; align-items: center; gap: 14px; font-size: 14px; font-weight: 600; color: var(--ink); }
+  .btn-sm { padding: 8px 16px; font-size: 13px; }
+  .portal-tabs { display: flex; gap: 2px; padding: 0 20px; background: var(--white); border-bottom: 1px solid var(--line); overflow-x: auto; }
+  .ptab { padding: 15px 18px; background: none; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; font: inherit; font-weight: 600; font-size: 14px; color: var(--slate); cursor: pointer; white-space: nowrap; }
+  .ptab:hover { color: var(--ink); }
+  .ptab.active { color: var(--ipg-blue); border-bottom-color: var(--ipg-blue); }
+  .portal-main { max-width: 920px; margin: 0 auto; padding: 34px 24px 90px; }
+  .portal-main h1 { font-size: 26px; margin: 0 0 6px; }
+  .portal-greet { color: var(--slate); margin: 0 0 28px; }
+  .ptab-panel h2 { font-size: 18px; margin: 0 0 14px; }
+  /* ---- Stat cards ---- */
+  .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 30px; }
+  .stat-card { background: var(--white); border: 1px solid var(--line); border-radius: 14px; padding: 20px 22px; box-shadow: var(--shadow-card); }
+  .stat-card .num { font-size: 30px; font-weight: 700; color: var(--ipg-blue); line-height: 1.1; }
+  .stat-card .lbl { font-size: 13px; color: var(--slate); margin-top: 4px; }
+  .stat-card[data-goto] { cursor: pointer; }
+  .stat-card[data-goto]:hover { border-color: var(--ipg-blue); }
+  .quick-actions { display: flex; gap: 10px; flex-wrap: wrap; margin: -14px 0 28px; }
+  /* ---- Panels & lists ---- */
+  .portal-panel { background: var(--white); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow-card); padding: 24px 26px; margin-bottom: 22px; }
+  .portal-panel > h2 { margin-top: 0; }
+  .panel-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
+  .panel-head h2 { margin: 0; }
+  .doc-list { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+  .doc-list li { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); }
+  .doc-ico { flex-shrink: 0; width: 34px; height: 34px; border-radius: 9px; background: var(--honey-soft, #F6ECD7); color: var(--ipg-blue); display: flex; align-items: center; justify-content: center; }
+  .doc-ico svg { width: 18px; height: 18px; }
+  .doc-meta { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .doc-meta .n { font-weight: 600; font-size: 14.5px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .doc-meta .m { font-size: 12.5px; color: var(--slate); }
+  .doc-dl { flex-shrink: 0; font-weight: 600; font-size: 13px; color: var(--ipg-blue); text-decoration: none; }
+  .doc-dl:hover { text-decoration: underline; }
+  .contact-actions { flex-shrink: 0; display: flex; gap: 14px; }
+  .doc-dl-danger { color: #b23b3b; }
+  .contact-form { margin-top: 18px; }
+  .portal-note { font-size: 12.5px; color: var(--slate); margin: 14px 0 0; }
+  .doc-empty { font-size: 14px; color: var(--slate); }
+  .portal-toast { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); background: var(--ink, #23303f); color: #fff; font-size: 13.5px; line-height: 1.45; padding: 11px 18px; border-radius: 10px; box-shadow: 0 6px 24px rgba(0,0,0,0.18); z-index: 120; max-width: min(90vw, 420px); text-align: center; opacity: 0; transition: opacity 0.25s ease; pointer-events: none; }
+  .portal-toast.show { opacity: 1; }
+  /* ---- Policy rows ---- */
+  .policy-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+  .policy-list li { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 16px 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); }
+  .policy-info { display: flex; flex-direction: column; min-width: 0; }
+  .policy-info .n { font-weight: 600; font-size: 15px; color: var(--ink); }
+  .policy-info .m { font-size: 12.5px; color: var(--slate); margin-top: 2px; }
+  .badge { flex-shrink: 0; font-size: 12px; font-weight: 600; padding: 4px 11px; border-radius: 999px; white-space: nowrap; }
+  .badge.active { background: #e6f4ea; color: #1e7a3d; }
+  .badge.pending { background: var(--honey-soft, #F6ECD7); color: #9a6a1c; }
+  .badge.issued { background: #e7effb; color: var(--ipg-blue); }
+  /* ---- Certificates: add-holder form ---- */
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .form-field.full { grid-column: 1 / -1; }
+  .lbl-hint { font-weight: 400; color: var(--slate); font-size: 12px; }
+  /* ---- Account ---- */
+  .acct-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 28px; }
+  .acct-item .k { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--slate); font-weight: 600; }
+  .acct-item .v { font-size: 15px; color: var(--ink); margin-top: 3px; }
+  @media (max-width: 620px) {
+    .stat-grid { grid-template-columns: 1fr; }
+    .form-grid, .acct-grid { grid-template-columns: 1fr; }
+    .portal-header, .portal-tabs { padding-left: 18px; padding-right: 18px; }
+    /* let long document names wrap to two lines instead of hard-truncating */
+    .doc-meta .n { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  }
+</style>
+</head>
+<body>
+
+<div class="portal-flag">IPG Client Portal — preview build (not yet connected to live accounts)</div>
+
+<!-- LOGIN VIEW -->
+<section id="portalLogin" class="portal-auth">
+  <div class="portal-card">
+    <img class="logo-img" src="../assets/logo.png" alt="Insurance Partner Group">
+    <h1 id="loginTitle">Client Login</h1>
+    <p class="portal-sub" id="loginSub">Access your policies, documents, and certificates of insurance.</p>
+    <!-- PREVIEW MODE ONLY: portal.js hides the login form and shows these demo
+         buttons instead, so nobody types real credentials into a mock form.
+         Once Clerk is live (PORTAL_CONFIG.clerkPublishableKey set) the real
+         form below is shown and this block stays hidden. -->
+    <div id="previewEntry" hidden>
+      <button id="demoPersonal" class="btn btn-primary" type="button">View demo — Personal client</button>
+      <button id="demoCommercial" class="btn btn-outline" type="button">View demo — Business client</button>
+    </div>
+    <form id="loginForm" novalidate>
+      <div class="form-field"><label for="plEmail">Email</label><input id="plEmail" type="email" autocomplete="email" required></div>
+      <div class="form-field"><label for="plPass">Password</label><input id="plPass" type="password" autocomplete="current-password" required></div>
+      <button class="btn btn-primary" type="submit">Sign In</button>
+      <p class="portal-msg" id="loginMsg" aria-live="polite"></p>
+    </form>
+    <p class="portal-help">Accounts are set up by IPG. Need access? <a href="/contact/">Contact us</a> or call (214)&nbsp;377-1460.</p>
+  </div>
+</section>
+
+<!-- DASHBOARD VIEW -->
+<div id="portalApp" hidden>
+  <header class="portal-header">
+    <a class="brand" href="./"><img class="logo-img" src="../assets/logo.png" alt="IPG"></a>
+    <div class="portal-user"><span id="pUser">Client</span><button id="signOut" class="btn btn-outline btn-sm" type="button">Sign out</button></div>
+  </header>
+
+  <nav class="portal-tabs" id="portalTabs">
+    <button class="ptab active" type="button" data-tab="overview">Overview</button>
+    <button class="ptab" type="button" data-tab="documents">Documents</button>
+    <button class="ptab" type="button" data-tab="certificates" id="certTab">Certificates</button>
+    <button class="ptab" type="button" data-tab="account">Account</button>
+  </nav>
+
+  <main class="portal-main">
+    <h1 id="pWelcome">Welcome</h1>
+    <p class="portal-greet" id="pCompany"></p>
+
+    <!-- OVERVIEW -->
+    <div class="ptab-panel" data-panel="overview">
+      <div class="stat-grid">
+        <div class="stat-card"><div class="num" id="statPolicies">—</div><div class="lbl">Active policies</div></div>
+        <div class="stat-card" data-goto="documents"><div class="num" id="statDocs">—</div><div class="lbl">Documents on file</div></div>
+        <div class="stat-card"><div class="num" id="statThird">—</div><div class="lbl" id="statThirdLbl">Certificates issued</div></div>
+      </div>
+      <div class="quick-actions" id="quickActions"></div>
+      <div class="portal-panel">
+        <h2>Your Policies</h2>
+        <ul class="policy-list" id="policyList"></ul>
+      </div>
+    </div>
+
+    <!-- DOCUMENTS -->
+    <div class="ptab-panel" data-panel="documents" hidden>
+      <div class="portal-panel">
+        <h2>Your Documents</h2>
+        <p class="portal-note" style="margin-top:0;">Policies, ID cards, and declaration pages on file with IPG.</p>
+        <ul class="doc-list" id="docList"></ul>
+      </div>
+    </div>
+
+    <!-- CERTIFICATES -->
+    <div class="ptab-panel" data-panel="certificates" hidden>
+      <!-- Add a holder -->
+      <div class="portal-panel">
+        <h2>Add a certificate holder</h2>
+        <p class="portal-note" style="margin:0 0 14px;">Add who needs proof of insurance and we&rsquo;ll issue a certificate instantly using your standard coverage.</p>
+        <form id="holderForm" novalidate>
+          <div class="form-grid">
+            <div class="form-field"><label for="hName">Holder name</label><input id="hName" type="text" maxlength="200" required></div>
+            <div class="form-field"><label for="hAddr">Holder address</label><input id="hAddr" type="text" maxlength="300"></div>
+          </div>
+          <button class="btn btn-primary btn-sm" type="submit">Add holder</button>
+          <p class="portal-msg" id="holderMsg" aria-live="polite"></p>
+        </form>
+      </div>
+
+      <!-- Holders / issued certs -->
+      <div class="portal-panel">
+        <h2>Certificate holders</h2>
+        <ul class="doc-list" id="holderList"></ul>
+      </div>
+    </div>
+
+    <!-- ACCOUNT -->
+    <div class="ptab-panel" data-panel="account" hidden>
+      <div class="portal-panel">
+        <div class="panel-head"><h2>Account Details</h2></div>
+        <div class="acct-grid" id="acctGrid"></div>
+        <p class="portal-note">To update these details, message us at <a href="/contact/">ipg.team/contact</a> or call (214)&nbsp;377-1460.</p>
+      </div>
+
+      <div class="portal-panel">
+        <div class="panel-head"><h2>Additional Contacts</h2></div>
+        <p class="portal-note" style="margin:0 0 14px;">Other people we can reach about your account &mdash; billing, claims, or day-to-day questions.</p>
+        <ul class="doc-list" id="contactList"></ul>
+        <form id="contactForm" novalidate class="contact-form">
+          <div class="form-grid">
+            <div class="form-field"><label for="cName">Name</label><input id="cName" type="text" maxlength="120" required></div>
+            <div class="form-field"><label for="cRole">Role <span class="lbl-hint">(optional)</span></label><input id="cRole" type="text" maxlength="80" placeholder="e.g. Billing, Office Manager"></div>
+            <div class="form-field"><label for="cEmail">Email</label><input id="cEmail" type="email" maxlength="254"></div>
+            <div class="form-field"><label for="cPhone">Phone</label><input id="cPhone" type="tel" maxlength="40"></div>
+          </div>
+          <input type="hidden" id="cId" value="">
+          <button class="btn btn-primary btn-sm" type="submit" id="contactSubmitBtn">Add contact</button>
+          <button class="btn btn-outline btn-sm" type="button" id="contactCancelBtn" hidden>Cancel</button>
+          <p class="portal-msg" id="contactMsg" aria-live="polite"></p>
+        </form>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="portal.js?v=6"></script>
+</body>
+</html>

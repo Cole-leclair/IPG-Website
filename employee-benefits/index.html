@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#2B5EA7">
+<title>IPG</title>
+<meta name="description" content="Group health, dental, vision, life, and disability benefits for small and mid-size businesses in Dallas, TX.">
+<link rel="canonical" href="https://ipg.team/employee-benefits/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Employee Benefits in Dallas, TX | Insurance Partner Group">
+<meta property="og:description" content="Group health, dental, vision, life, and disability benefits for small and mid-size businesses in Dallas, TX.">
+<meta property="og:url" content="https://ipg.team/employee-benefits/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap">
+<link rel="stylesheet" href="/assets/styles.css">
+  <link rel="icon" type="image/png" href="/assets/favicon.png">
+  <link rel="icon" type="image/x-icon" href="/assets/favicon.ico">
+  <link rel="apple-touch-icon" href="/assets/favicon.png">
+</head>
+<body>
+
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header>
+  <nav class="nav" aria-label="Primary">
+    <a class="brand" href="/">
+      <img class="logo-img" src="/assets/logo.png" alt="Insurance Partner Group">
+    </a>
+    <div class="nav-links" id="navLinks">
+      <a href="/" data-nav="home">Home</a>
+      <a href="/personal-insurance/" data-nav="personal">Personal</a>
+      <a href="/business-insurance/" data-nav="business">Business</a>
+      <a href="/employee-benefits/" data-nav="benefits" class="active">Benefits</a>
+      <a href="/service-center/" data-nav="service">Service</a>
+      <a href="/about/" data-nav="about">About</a>
+      <a href="/contact/" data-nav="contact">Contact</a>
+      <a href="/portal/" class="nav-login">Client Login</a>
+    </div>
+    <div class="nav-cta"> <a class="nav-phone" href="tel:12143771460">(214) 377-1460</a>
+      <a class="btn btn-primary" href="/contact/">Get a Quote</a>
+      <button class="menu-toggle" id="menuToggle" aria-label="Toggle menu" aria-expanded="false" aria-controls="navLinks"><span></span></button>
+    </div>
+  </nav>
+</header>
+
+<main id="main">
+<section class="page active" data-route="benefits" aria-labelledby="h-benefits">
+    <div class="hero">
+      <div class="wrap">
+        <div class="reveal in">
+          <p class="eyebrow">Employee Benefits</p>
+          <h1 id="h-benefits">Employee benefits that help you keep good people.</h1>
+          <p class="lede">Group health, dental, vision, and life plans that help small and mid-size employers compete for talent &mdash; without an HR department to manage them.</p>
+          <div class="hero-actions">
+            <a class="btn btn-primary" href="#benefitsQuote" data-scroll-to="benefitsQuote">Talk to a Benefits Advisor</a>
+            <a class="btn btn-outline" href="#benefitsPackageBuilder" data-scroll-to="benefitsPackageBuilder">Build Your Package</a>
+          </div>
+        </div>
+        <div class="hero-photo-img reveal in">
+          <img src="/assets/benefits-hero.jpg" alt="A family watching the sunset together">
+        </div>
+      </div>
+    </div>
+
+    <section class="block">
+      <div class="wrap" style="max-width: 760px;">
+        <div class="section-head reveal">
+          <p class="eyebrow">Getting Started</p>
+          <h2>Every team is different. Your benefits should be too.</h2>
+          <p>A single health plan rarely fits everyone on staff. The right package depends on your team's size, age range, and what actually gets people to stay. We help you put together a mix that fits your budget and your people &mdash; not a one-size-fits-all plan.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="block" style="background:var(--white); border-top:1px solid var(--line); border-bottom:1px solid var(--line);">
+      <div class="wrap">
+        <div class="section-head reveal">
+          <p class="eyebrow">Real-World Examples</p>
+          <h2>What your employees actually ask about.</h2>
+          <p>Benefits decisions usually start with a specific question, not a spreadsheet. Here's what comes up most.</p>
+        </div>
+        <div class="example-grid reveal">
+          <div class="example-card"><p class="q">&ldquo;When does my coverage actually start?&rdquo;</p><span class="tag">GRP</span></div>
+          <div class="example-card"><p class="q">&ldquo;I'm out for six weeks after surgery &mdash; now what?&rdquo;</p><span class="tag">DI</span></div>
+          <div class="example-card"><p class="q">&ldquo;Can I add my spouse and kids to the plan?&rdquo;</p><span class="tag">D&amp;V</span></div>
+          <div class="example-card"><p class="q">&ldquo;The other offer I got has better benefits.&rdquo;</p><span class="tag">VOL</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="block" id="benefitsPackageBuilder">
+      <div class="wrap">
+        <div class="section-head reveal">
+          <p class="eyebrow">Build A Package</p>
+          <h2>Toggle what matters to your team.</h2>
+          <p>Click through the options below to see what a package could look like &mdash; then we'll turn it into real numbers.</p>
+        </div>
+        <div class="pkg-builder reveal">
+          <div class="pkg-options" id="pkgOptions"></div>
+          <div class="pkg-summary">
+            <h3>Your package</h3>
+            <p class="pkg-sub">Updates as you toggle options on.</p>
+            <div id="pkgSummaryBody"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="block" style="background:var(--white); border-top:1px solid var(--line); border-bottom:1px solid var(--line);">
+      <div class="wrap">
+        <div class="section-head reveal">
+          <p class="eyebrow">Every Option</p>
+          <h2>The rest of the package, when you need it.</h2>
+          <p>Beyond the core plans, here's what else we help employers coordinate.</p>
+        </div>
+        <div class="coverage-checklist reveal">
+          <ul>
+            <li>Vision (Standalone)</li>
+            <li>Short-Term Disability</li>
+            <li>Long-Term Disability</li>
+            <li>Supplemental Life</li>
+            <li>Critical Illness &amp; Accident</li>
+            <li>FSA / HSA Setup Support</li>
+          </ul>
+          <ul>
+            <li>Section 125 Plans</li>
+            <li>COBRA Administration Support</li>
+            <li>Employee Assistance Program (EAP)</li>
+            <li>Long-Term Care</li>
+            <li>Voluntary Benefits Enrollment</li>
+            <li>Group Life (Basic &amp; Supplemental)</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <div class="cta-banner"><div class="wrap"><div><h2>Is your benefits package keeping up with your team?</h2><p>A growing headcount, a competitive job market, a plan from three renewals ago &mdash; chances are something's changed. We'll check what's working and what isn't.</p></div><a class="btn btn-primary" href="#benefitsQuote" data-scroll-to="benefitsQuote">Find My Package</a></div></div>
+
+    <section class="block" id="benefitsQuote">
+      <div class="wrap">
+        <div class="section-head reveal">
+          <p class="eyebrow">Get Started</p>
+          <h2>Request an employee benefits quote.</h2>
+        </div>
+        <div class="contact-card reveal">
+          <div class="contact-copy">
+            <div class="form-success" id="benefitsFormSuccess">Thanks! We’ve got your request &mdash; a benefits advisor will reach out shortly. Prefer to talk now? Call (214)&nbsp;377-1460.</div>
+            <form id="benefitsQuoteForm" name="benefits-quote" method="POST" action="/" enctype="multipart/form-data" data-netlify="true" data-netlify-honeypot="bot-field" novalidate>
+            <input type="hidden" name="form-name" value="benefits-quote">
+            <input type="hidden" name="lead_type" value="Employee Benefits Quote">
+            <p class="hp-field" hidden aria-hidden="true"><label>Do not fill this out if you’re human: <input name="bot-field" tabindex="-1" autocomplete="off"></label></p>
+              <div class="form-grid">
+                <div class="form-field"><label for="beqName">Name</label><input id="beqName" name="name" type="text" autocomplete="name" required></div>
+                <div class="form-field"><label for="beqPhone">Phone</label><input id="beqPhone" name="phone" type="tel" autocomplete="tel" required></div>
+                <div class="form-field full"><label for="beqEmail">Email</label><input id="beqEmail" name="email" type="email" autocomplete="email" required></div>
+                <div class="form-field full"><label for="beqType">What are you looking to add?</label>
+                  <select id="beqType" name="type">
+                    <option value="">Select one</option>
+                    <option>Group Health</option>
+                    <option>Dental &amp; Vision</option>
+                    <option>Group Life</option>
+                    <option>Disability</option>
+                    <option>Voluntary Benefits</option>
+                    <option>Not sure yet</option>
+                  </select>
+                </div>
+                <div class="form-field full"><label for="beqMsg">Tell us about your team</label><textarea id="beqMsg" name="message" placeholder="Optional"></textarea></div>
+                <div class="form-field full">
+                  <label for="beqCensus">Upload your group employee census</label>
+                  <input class="upload-input" id="beqCensus" name="census" type="file" accept=".pdf,.jpg,.jpeg,.png,.heic,.heif,.webp,.gif,.doc,.docx,.xls,.xlsx,.csv">
+                  <input class="upload-input" id="beqCensus-2" name="census-2" type="file" accept=".pdf,.jpg,.jpeg,.png,.heic,.heif,.webp,.gif,.doc,.docx,.xls,.xlsx,.csv">
+                  <input class="upload-input" id="beqCensus-3" name="census-3" type="file" accept=".pdf,.jpg,.jpeg,.png,.heic,.heif,.webp,.gif,.doc,.docx,.xls,.xlsx,.csv">
+                  <input class="upload-input" id="beqCensus-4" name="census-4" type="file" accept=".pdf,.jpg,.jpeg,.png,.heic,.heif,.webp,.gif,.doc,.docx,.xls,.xlsx,.csv">
+                  <input class="upload-input" id="beqCensus-5" name="census-5" type="file" accept=".pdf,.jpg,.jpeg,.png,.heic,.heif,.webp,.gif,.doc,.docx,.xls,.xlsx,.csv">
+                  <div class="upload-row" data-group="beqCensus">
+                    <label class="upload-btn" for="beqCensus"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V4"/><path d="M8 8l4-4 4 4"/><path d="M4 14v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg>Upload</label>
+                    <label class="upload-btn add" for="beqCensus-2" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V4"/><path d="M8 8l4-4 4 4"/><path d="M4 14v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg>Add another file</label>
+                    <label class="upload-btn add" for="beqCensus-3" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V4"/><path d="M8 8l4-4 4 4"/><path d="M4 14v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg>Add another file</label>
+                    <label class="upload-btn add" for="beqCensus-4" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V4"/><path d="M8 8l4-4 4 4"/><path d="M4 14v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg>Add another file</label>
+                    <label class="upload-btn add" for="beqCensus-5" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V4"/><path d="M8 8l4-4 4 4"/><path d="M4 14v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg>Add another file</label>
+                  </div>
+                  <ul class="upload-names" id="beqCensus-names"></ul>
+                </div>
+              </div>
+              <button class="btn btn-primary" type="submit">Request a Quote</button>
+              <p class="form-note">Prefer to talk? Call <a href="tel:12143771460" style="color:var(--ipg-blue); font-weight:600;">(214) 377-1460</a>.</p>
+            </form>
+          </div>
+          <div class="contact-details">
+            <p class="cd-head">Reach us directly</p>
+            <p class="cd-sub">You'll hear back from a real person on our team, not a call center.</p>
+            <div class="row"><span class="k">Phone</span><a class="v" href="tel:12143771460">(214) 377-1460</a></div>
+            <div class="row"><span class="k">Email</span><a class="v" href="mailto:Cole@ipg.team">Cole@ipg.team</a></div>
+            <div class="row"><span class="k">Office</span><address class="v">710 E Park Blvd, Suite 204B<br>Plano, TX 75074</address></div>
+            <div class="cd-foot"><a class="link-arrow" href="https://www.google.com/maps/search/?api=1&amp;query=710+E+Park+Blvd+Suite+204B+Plano+TX+75074" target="_blank" rel="noopener noreferrer">Get directions <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="block" style="background:var(--white); border-top:1px solid var(--line);">
+      <div class="wrap">
+        <div class="section-head center reveal"><p class="eyebrow">Employee Benefits FAQ</p><h2>Questions we hear often.</h2></div>
+        <div class="faq-list reveal">
+          <details class="faq-item"><summary>Do you work with small groups?</summary><p>Yes &mdash; we help small and mid-size employers put together group health, dental, vision, and life benefits.</p></details>
+          <details class="faq-item"><summary>Can employees choose different plan levels?</summary><p>Depending on the carrier and group size, often yes &mdash; we'll walk through what tiers are available for your group.</p></details>
+        </div>
+      </div>
+    </section>
+  </section>
+
+  <!-- ============ ABOUT ============ -->
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-top">
+      <a class="brand" href="/">
+        <img class="logo-img" src="/assets/logo.png" alt="Insurance Partner Group">
+      </a>
+      <div class="foot-links">
+        <div><span class="h">Coverage</span><a href="/personal-insurance/">Personal Lines</a><a href="/business-insurance/">Business Lines</a><a href="/employee-benefits/">Employee Benefits</a></div>
+        <div><span class="h">Agency</span><a href="/about/">Our Team</a><a href="/service-center/">Service Center</a><a href="/contact/">Contact</a></div>
+        <div><span class="h">Reach Us</span><a href="tel:12143771460">(214) 377-1460</a><a href="mailto:Cole@ipg.team">Cole@ipg.team</a></div>
+      </div>
+    </div>
+    <div class="foot-bottom">
+      <span>&copy; <span class="tnum">2026</span> Insurance Partner Group LLC</span>
+      <address>710 E Park Blvd Suite 204B, Plano, TX 75074</address>
+    </div>
+  </div>
+</footer>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "InsuranceAgency",
+  "name": "Insurance Partner Group",
+  "url": "https://ipg.team/",
+  "telephone": "+1-214-377-1460",
+  "email": "Cole@ipg.team",
+  "address": {
+    "@type": "PostalAddress",
+    "streetAddress": "710 E Park Blvd Suite 204B",
+    "addressLocality": "Plano",
+    "addressRegion": "TX",
+    "postalCode": "75074",
+    "addressCountry": "US"
+  },
+  "areaServed": "Dallas, TX",
+  "founder": { "@type": "Person", "name": "Cole LeClair" }
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Do you work with small groups?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes — we help small and mid-size employers put together group health, dental, vision, and life benefits."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Can employees choose different plan levels?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Depending on the carrier and group size, often yes — we'll walk through what tiers are available for your group."
+      }
+    }
+  ]
+}
+</script>
+<script src="/assets/app.js" defer></script>
+</body>
+</html>

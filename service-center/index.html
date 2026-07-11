@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#2B5EA7">
+<title>IPG</title>
+<meta name="description" content="Report a claim, make a payment, request a certificate of insurance (COI), or change a policy. Same-team service for Insurance Partner Group clients in Dallas, TX.">
+<link rel="canonical" href="https://ipg.team/service-center/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Service Center | Insurance Partner Group">
+<meta property="og:description" content="Report a claim, make a payment, request a certificate of insurance (COI), or change a policy. Same-team service for Insurance Partner Group clients in Dallas, TX.">
+<meta property="og:url" content="https://ipg.team/service-center/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap">
+<link rel="stylesheet" href="/assets/styles.css">
+  <link rel="icon" type="image/png" href="/assets/favicon.png">
+  <link rel="icon" type="image/x-icon" href="/assets/favicon.ico">
+  <link rel="apple-touch-icon" href="/assets/favicon.png">
+</head>
+<body>
+
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header>
+  <nav class="nav" aria-label="Primary">
+    <a class="brand" href="/">
+      <img class="logo-img" src="/assets/logo.png" alt="Insurance Partner Group">
+    </a>
+    <div class="nav-links" id="navLinks">
+      <a href="/" data-nav="home">Home</a>
+      <a href="/personal-insurance/" data-nav="personal">Personal</a>
+      <a href="/business-insurance/" data-nav="business">Business</a>
+      <a href="/employee-benefits/" data-nav="benefits">Benefits</a>
+      <a href="/service-center/" data-nav="service" class="active">Service</a>
+      <a href="/about/" data-nav="about">About</a>
+      <a href="/contact/" data-nav="contact">Contact</a>
+      <a href="/portal/" class="nav-login">Client Login</a>
+    </div>
+    <div class="nav-cta"> <a class="nav-phone" href="tel:12143771460">(214) 377-1460</a>
+      <a class="btn btn-primary" href="/contact/">Get a Quote</a>
+      <button class="menu-toggle" id="menuToggle" aria-label="Toggle menu" aria-expanded="false" aria-controls="navLinks"><span></span></button>
+    </div>
+  </nav>
+</header>
+
+<main id="main">
+<section class="page active" data-route="service" aria-labelledby="h-service">
+    <div class="service-fold">
+        <div class="page-hero">
+      <div class="wrap">
+        <p class="eyebrow">Service Center</p>
+        <h1 id="h-service">Already a client? We've got the day-to-day.</h1>
+        <p class="lede">Claims, payments, certificates, and policy changes &mdash; handled by the same team that built your coverage. Here's how to get what you need, fast.</p>
+        <div class="hero-actions"><a class="btn btn-primary" href="tel:12143771460">Call (214) 377-1460</a><a class="btn btn-outline" href="mailto:Cole@ipg.team">Email Us</a></div>
+      </div>
+    </div>
+
+    <section class="block" id="serviceTasks">
+      <div class="wrap">
+        <div class="section-head center reveal"><p class="eyebrow">How Can We Help?</p><h2>Pick what you need.</h2><p>Choose a service and we'll ask a few quick questions to get it moving.</p></div>
+        <div class="service-tabs reveal" role="tablist">
+          <button class="service-tab" type="button" data-task="claim"><span class="code-chip">CLAIM</span><h3>Report a Claim</h3><p>An accident, home damage, or a claim question.</p></button>
+          <button class="service-tab" type="button" data-task="pay"><span class="code-chip">PAY</span><h3>Make a Payment</h3><p>Find the right place to pay your carrier.</p></button>
+          <button class="service-tab" type="button" data-task="coi"><span class="code-chip">COI</span><h3>Request a Certificate</h3><p>Proof of insurance for a contract or landlord.</p></button>
+          <button class="service-tab" type="button" data-task="change"><span class="code-chip">CHG</span><h3>Change a Policy</h3><p>Add a vehicle, driver, address, or coverage.</p></button>
+        </div>
+
+        <div class="service-form" data-form="claim">
+          <h3>Report a claim</h3>
+          <p class="sf-sub">Tell us what happened and we'll get on it with you. For an emergency, call your carrier's 24/7 claim line on your policy documents.</p>
+          <div class="form-success" id="claimFormSuccess">Thanks &mdash; your claim details are in. A member of our service team will contact you right away to walk you through the next steps.</div>
+          <form id="claimForm" name="service-claim" method="POST" action="/" data-netlify="true" data-netlify-honeypot="bot-field" novalidate>
+            <input type="hidden" name="form-name" value="service-claim">
+            <input type="hidden" name="lead_type" value="Claim Report">
+            <p class="hp-field" hidden aria-hidden="true"><label>Do not fill this out if you’re human: <input name="bot-field" tabindex="-1" autocomplete="off"></label></p>
+            <div class="form-grid">
+              <div class="form-field"><label for="clName">Name</label><input id="clName" name="name" type="text" autocomplete="name" required></div>
+              <div class="form-field"><label for="clPhone">Phone</label><input id="clPhone" name="phone" type="tel" autocomplete="tel" required></div>
+              <div class="form-field full"><label for="clEmail">Email</label><input id="clEmail" name="email" type="email" autocomplete="email" required></div>
+              <div class="form-field"><label for="clPolicy">Policy number (if handy)</label><input id="clPolicy" name="policy" type="text"></div>
+              <div class="form-field"><label for="clType">What kind of claim?</label><select id="clType" name="type" required><option value="">Select one</option><option>Auto accident</option><option>Home / property damage</option><option>Umbrella / liability</option><option>Other</option></select></div>
+              <div class="form-field full"><label for="clDate">When did it happen?</label><input id="clDate" name="date" type="date"></div>
+              <div class="form-field full"><label for="clWhat">What happened?</label><textarea id="clWhat" name="details" placeholder="A short description helps us start the claim" required></textarea></div>
+            </div>
+            <button class="btn btn-primary" type="submit">Start My Claim</button>
+            <p class="form-note">Prefer to talk? Call <a href="tel:12143771460" style="color:var(--ipg-blue); font-weight:600;">(214) 377-1460</a>.</p>
+          </form>
+        </div>
+
+        <div class="service-form" data-form="pay">
+          <h3>Make a payment</h3>
+          <p class="sf-sub">Most payments run directly through your carrier. Tell us which policy and we'll send you the right secure payment link &mdash; we never take card details here.</p>
+          <div class="form-success" id="payFormSuccess">Thanks &mdash; we’ll email you a secure payment link for the right policy shortly. We never take card details on this site.</div>
+          <form id="payForm" name="service-payment" method="POST" action="/" data-netlify="true" data-netlify-honeypot="bot-field" novalidate>
+            <input type="hidden" name="form-name" value="service-payment">
+            <input type="hidden" name="lead_type" value="Payment Request">
+            <p class="hp-field" hidden aria-hidden="true"><label>Do not fill this out if you’re human: <input name="bot-field" tabindex="-1" autocomplete="off"></label></p>
+            <div class="form-grid">
+              <div class="form-field"><label for="pyName">Name</label><input id="pyName" name="name" type="text" autocomplete="name" required></div>
+              <div class="form-field"><label for="pyEmail">Email</label><input id="pyEmail" name="email" type="email" autocomplete="email" required></div>
+              <div class="form-field"><label for="pyPhone">Phone</label><input id="pyPhone" name="phone" type="tel" autocomplete="tel"></div>
+              <div class="form-field"><label for="pyCarrier">Insurance company (if you know it)</label><input id="pyCarrier" name="carrier" type="text"></div>
+              <div class="form-field full"><label for="pyPolicy">Policy number (if handy)</label><input id="pyPolicy" name="policy" type="text"></div>
+              <div class="form-field full"><label for="pyMsg">Anything else?</label><textarea id="pyMsg" name="message" placeholder="Optional"></textarea></div>
+            </div>
+            <button class="btn btn-primary" type="submit">Send Me the Payment Link</button>
+            <p class="form-note">Prefer to talk? Call <a href="tel:12143771460" style="color:var(--ipg-blue); font-weight:600;">(214) 377-1460</a>.</p>
+          </form>
+        </div>
+
+        <div class="service-form" data-form="coi">
+          <h3>Request a certificate</h3>
+          <p class="sf-sub">Send us who needs it and what the contract requires &mdash; most go out the same business day.</p>
+          <div class="form-success" id="certFormSuccess">Thanks &mdash; we’ve got your certificate request. Most go out the same business day, and we’ll email it to you.</div>
+          <form id="certForm" name="service-certificate" method="POST" action="/" data-netlify="true" data-netlify-honeypot="bot-field" novalidate>
+            <input type="hidden" name="form-name" value="service-certificate">
+            <input type="hidden" name="lead_type" value="Certificate (COI) Request">
+            <p class="hp-field" hidden aria-hidden="true"><label>Do not fill this out if you’re human: <input name="bot-field" tabindex="-1" autocomplete="off"></label></p>
+            <div class="form-grid">
+              <div class="form-field"><label for="certName">Your name</label><input id="certName" name="name" type="text" autocomplete="name" required></div>
+              <div class="form-field"><label for="certCompany">Your business</label><input id="certCompany" name="company" type="text" required></div>
+              <div class="form-field full"><label for="certEmail">Email</label><input id="certEmail" name="email" type="email" autocomplete="email" required></div>
+              <div class="form-field full"><label for="certHolder">Certificate holder</label><input id="certHolder" name="holder" type="text" placeholder="Name and address of the party requesting it" required></div>
+              <div class="form-field full"><label for="certReq">Requirements or notes</label><textarea id="certReq" name="requirements" placeholder="Paste any specific limits, additional insured, or wording the contract requires"></textarea></div>
+            </div>
+            <button class="btn btn-primary" type="submit">Request Certificate</button>
+            <p class="form-note">Prefer to talk? Call <a href="tel:12143771460" style="color:var(--ipg-blue); font-weight:600;">(214) 377-1460</a>.</p>
+          </form>
+        </div>
+
+        <div class="service-form" data-form="change">
+          <h3>Change a policy</h3>
+          <p class="sf-sub">Add a vehicle or driver, update an address, adjust a limit, or add an additional insured &mdash; tell us what changed and we'll take care of it.</p>
+          <div class="form-success" id="changeFormSuccess">Thanks &mdash; your change request is in. We’ll confirm the update and follow up if we need anything else.</div>
+          <form id="changeForm" name="service-policy-change" method="POST" action="/" data-netlify="true" data-netlify-honeypot="bot-field" novalidate>
+            <input type="hidden" name="form-name" value="service-policy-change">
+            <input type="hidden" name="lead_type" value="Policy Change Request">
+            <p class="hp-field" hidden aria-hidden="true"><label>Do not fill this out if you’re human: <input name="bot-field" tabindex="-1" autocomplete="off"></label></p>
+            <div class="form-grid">
+              <div class="form-field"><label for="chName">Name</label><input id="chName" name="name" type="text" autocomplete="name" required></div>
+              <div class="form-field"><label for="chPhone">Phone</label><input id="chPhone" name="phone" type="tel" autocomplete="tel" required></div>
+              <div class="form-field full"><label for="chEmail">Email</label><input id="chEmail" name="email" type="email" autocomplete="email" required></div>
+              <div class="form-field"><label for="chPolicy">Policy number (if handy)</label><input id="chPolicy" name="policy" type="text"></div>
+              <div class="form-field"><label for="chType">What needs to change?</label><select id="chType" name="type" required><option value="">Select one</option><option>Add or remove a vehicle</option><option>Add a driver</option><option>Update address</option><option>Change coverage or limits</option><option>Add an additional insured</option><option>Other</option></select></div>
+              <div class="form-field full"><label for="chDetails">Details</label><textarea id="chDetails" name="details" placeholder="Tell us what to change" required></textarea></div>
+            </div>
+            <button class="btn btn-primary" type="submit">Submit Change Request</button>
+            <p class="form-note">Prefer to talk? Call <a href="tel:12143771460" style="color:var(--ipg-blue); font-weight:600;">(214) 377-1460</a>.</p>
+          </form>
+        </div>
+      </div>
+    </section>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-top">
+      <a class="brand" href="/">
+        <img class="logo-img" src="/assets/logo.png" alt="Insurance Partner Group">
+      </a>
+      <div class="foot-links">
+        <div><span class="h">Coverage</span><a href="/personal-insurance/">Personal Lines</a><a href="/business-insurance/">Business Lines</a><a href="/employee-benefits/">Employee Benefits</a></div>
+        <div><span class="h">Agency</span><a href="/about/">Our Team</a><a href="/service-center/">Service Center</a><a href="/contact/">Contact</a></div>
+        <div><span class="h">Reach Us</span><a href="tel:12143771460">(214) 377-1460</a><a href="mailto:Cole@ipg.team">Cole@ipg.team</a></div>
+      </div>
+    </div>
+    <div class="foot-bottom">
+      <span>&copy; <span class="tnum">2026</span> Insurance Partner Group LLC</span>
+      <address>710 E Park Blvd Suite 204B, Plano, TX 75074</address>
+    </div>
+  </div>
+</footer>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "InsuranceAgency",
+  "name": "Insurance Partner Group",
+  "url": "https://ipg.team/",
+  "telephone": "+1-214-377-1460",
+  "email": "Cole@ipg.team",
+  "address": {
+    "@type": "PostalAddress",
+    "streetAddress": "710 E Park Blvd Suite 204B",
+    "addressLocality": "Plano",
+    "addressRegion": "TX",
+    "postalCode": "75074",
+    "addressCountry": "US"
+  },
+  "areaServed": "Dallas, TX",
+  "founder": { "@type": "Person", "name": "Cole LeClair" }
+}
+</script>
+<script src="/assets/app.js" defer></script>
+</body>
+</html>
