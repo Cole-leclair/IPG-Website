@@ -14,13 +14,14 @@
 <!-- Shares the main site's design so it stays in sync automatically -->
 <link rel="stylesheet" href="../assets/styles.css">
 <!-- Clerk auth (Phase 1). The publishable key is public and safe to expose.
-     A pk_test_ (development) key only activates real login on localhost; the
-     deployed portal at ipg.team stays in preview mode until a production
-     pk_live_ key is set (see PORTAL_CONFIG + CLERK_ENABLED in portal.js). -->
+     This loads the PRODUCTION Clerk instance (clerk.ipg.team) so it must stay
+     in sync with PORTAL_CONFIG.clerkPublishableKey in portal.js — both must
+     point at the same instance or login will silently issue dev-instance
+     tokens the backend can't verify (see July 11 "unknown signing key" bug). -->
 <script
   async crossorigin="anonymous"
-  data-clerk-publishable-key="pk_test_ZXhjaXRpbmctb3lzdGVyLTc1LmNsZXJrLmFjY291bnRzLmRldiQ"
-  src="https://exciting-oyster-75.clerk.accounts.dev/npm/@clerk/clerk-js@5/dist/clerk.browser.js"
+  data-clerk-publishable-key="pk_live_Y2xlcmsuaXBnLnRlYW0k"
+  src="https://clerk.ipg.team/npm/@clerk/clerk-js@5/dist/clerk.browser.js"
   type="text/javascript"
 ></script>
 <style>
