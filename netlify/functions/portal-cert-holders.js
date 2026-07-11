@@ -1,13 +1,36 @@
-// GET  /portal/cert-holders — holders/certificates on the master COI
+// GET  /portal/cert-holders — certificates already issued for this client
 // POST /portal/cert-holders — add a holder (SELF-SERVICE, always instant issue)
 // COMMERCIAL ACCOUNTS ONLY. Maps to PortalData.getHolders() / addHolder().
-// The client only ever supplies name/address (see portal/index.html), so every
-// holder is standard coverage off the master COI — no wording selection, no
-// review routing.
+//
+// The client only ever supplies holder name + address (street/city/state/zip),
+// so every certificate is standard ACORD 25 wording off the master COI — no
+// wording selection, no review routing. Bindly runs the SAME generator its
+// agents use and files the PDF in the client's Cert Holders folder, so agents
+// see every portal-issued cert in Bindly's normal Details view.
 var auth = require("./utils/auth");
 var bindly = require("./utils/bindly");
 var respond = require("./utils/respond");
 var audit = require("./utils/audit");
+
+var MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+function fmtDate(s) {
+  if (!s) return "";
+  var d = new Date(s);
+  if (isNaN(d.getTime())) return String(s);
+  return MONTHS[d.getMonth()] + " " + d.getDate() + ", " + d.getFullYear();
+}
+
+// Field caps mirror the maxlength attributes in portal/index.html — but the
+// server is the one that counts. Never trust the browser to enforce limits.
+var LIMITS = { holder_name: 200, address1: 120, address2: 120, city: 80, state: 20, zip: 20 };
+function s(v, max) { return String(v == null ? "" : v).trim().slice(0, max); }
+
+// Build the one-line display address we hand back to the UI for the holder list.
+function displayAddress(f) {
+  var street = [f.address1, f.address2].filter(Boolean).join(", ");
+  var region = [f.city, [f.state, f.zip].filter(Boolean).join(" ").trim()].filter(Boolean).join(", ");
+  return [street, region].filter(Boolean).join(", ");
+}
 
 exports.handler = async function (event) {
   var method = event.httpMethod;
@@ -19,33 +42,67 @@ exports.handler = async function (event) {
   try { ctx = await auth.verifyRequest(event); }
   catch (e) { return respond.json(e.status || 401, { error: e.message }); }
 
+  // Server-side authorization — hiding the tab is UX; THIS is the real gate.
   if (ctx.accountType !== "commercial") {
     return respond.json(403, { error: "certificates are not available for personal accounts" });
   }
 
   try {
     if (method === "GET") {
-      // TODO(Bindly): const holders = await bindly.getHolders(ctx.bindlyClientId);
-      // Shape each as { id, name, address, status, date, url }.
-      return respond.json(200, { holders: [] }); // stub
+      var data = await bindly.getCertificates(ctx.bindlyClientId);
+      var raw = (data && data.certificates) || [];
+      var holders = raw.map(function (h, i) {
+        return {
+          id: h.id || h.certificate_id || ("cert-" + i),
+          name: h.holder || h.holder_name || h.name || "",
+          address: h.holder_address || h.address || "",
+          status: "issued",
+          date: fmtDate(h.issued_at || h.created_at || h.modified),
+          url: h.url || ""
+        };
+      });
+      return respond.json(200, { holders: holders });
     }
 
     // POST — add a holder. Always instant issue off the master COI.
-    var data;
-    try { data = JSON.parse(event.body || "{}"); }
+    var body;
+    try { body = JSON.parse(event.body || "{}"); }
     catch (e2) { return respond.json(400, { error: "invalid json" }); }
-    var name = String(data.name == null ? "" : data.name).trim().slice(0, 200);
-    var address = String(data.address == null ? "" : data.address).trim().slice(0, 300);
-    if (!name) return respond.json(400, { error: "holder name is required" });
 
-    // TODO(Bindly): const issued = await bindly.issueCertificate(ctx.bindlyClientId, { name, address });
-    //   -> generates the ACORD 25 from the master COI, returns { holder, url }.
-    // TODO(DB): dedupe recent identical (name, address) requests so a retry or
-    // double-submit can't issue the same certificate twice.
-    audit.log({ action: "cert_issued", actor: ctx.authUserId, bindlyClientId: ctx.bindlyClientId, target: name });
+    var fields = {
+      holder_name: s(body.name || body.holder_name, LIMITS.holder_name),
+      address1: s(body.address1, LIMITS.address1),
+      address2: s(body.address2, LIMITS.address2),
+      city: s(body.city, LIMITS.city),
+      state: s(body.state, LIMITS.state),
+      zip: s(body.zip, LIMITS.zip)
+    };
+    if (!fields.holder_name) return respond.json(400, { error: "holder name is required" });
+    if (!fields.address1 || !fields.city || !fields.state || !fields.zip) {
+      return respond.json(400, { error: "a complete holder address (street, city, state, zip) is required" });
+    }
+
+    var issued;
+    try {
+      issued = await bindly.issueCertificate(ctx.bindlyClientId, fields);
+    } catch (err) {
+      // A 404 from Bindly here means this client has no COI data on file yet —
+      // they aren't cert-ready. Return a clear, client-safe message rather than
+      // a generic error. (The portal has no review-fallback flow by design.)
+      if (err.upstreamStatus === 404) {
+        return respond.json(409, { error: "This account isn’t set up for self-service certificates yet. Please contact IPG and we’ll issue it for you." });
+      }
+      throw err;
+    }
+
+    audit.log({ action: "cert_issued", actor: ctx.authUserId, bindlyClientId: ctx.bindlyClientId, target: fields.holder_name });
     return respond.json(201, { ok: true, status: "issued", holder: {
-      name: name, address: address,
-      status: "issued", date: "Just now", url: null // stub: real signed URL from Bindly
+      id: (issued && issued.filename) || fields.holder_name,
+      name: fields.holder_name,
+      address: displayAddress(fields),
+      status: "issued",
+      date: "Just now",
+      url: (issued && issued.url) || ""
     }});
   } catch (e) {
     return respond.json(e.status || 500, { error: e.message });

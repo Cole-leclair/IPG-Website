@@ -1,26 +1,22 @@
 // GET    /portal/contacts          -> list this client's additional contacts
 // POST   /portal/contacts          -> add a contact { name, role, email, phone }
-// PUT    /portal/contacts?id=<id>  -> update a contact
+// PUT    /portal/contacts?id=<id>  -> update a contact (proxied to Bindly PATCH)
 // DELETE /portal/contacts?id=<id>  -> remove a contact
 // Maps to PortalData.getContacts()/addContact()/updateContact()/removeContact().
 //
-// These are REFERENCE contacts only (billing/safety/etc.) — not portal logins.
-// TODO(DB): Bindly's client model likely tracks one primary contact, not an
-// arbitrary list with custom roles, so for now these live in OUR portal DB
-// (a `portal_contacts` table — see ARCHITECTURE.md §3), scoped by
-// ctx.bindlyClientId. EVENTUALLY these should feed into Bindly instead (Cole
-// wants this) — once the Bindly developer confirms their API can read/write
-// additional contacts on a client record, swap the DB calls below for
-// bindly.getContacts/addContact/updateContact/removeContact and drop the
-// portal_contacts table.
+// These are REFERENCE contacts (billing/safety/HR/etc.) — not portal logins.
+// They live NATIVELY on the Bindly client record: Bindly supports unlimited
+// named contacts with free-text roles, and a contact added here is visible to
+// agents in Bindly instantly (and vice-versa) — one list, no shadow copy, no
+// sync. Each contact has a stable UUID `id` from Bindly.
 var auth = require("./utils/auth");
+var bindly = require("./utils/bindly");
 var respond = require("./utils/respond");
 var audit = require("./utils/audit");
 
 // Field caps mirror the maxlength attributes in portal/index.html — but the
 // server is the one that counts. Never trust the browser to enforce limits.
 var LIMITS = { name: 120, role: 80, email: 254, phone: 40 };
-var MAX_CONTACTS = 20; // TODO(DB): reject POST when the client already has this many.
 
 function cleanContact(input) {
   function s(v, max) { return String(v == null ? "" : v).trim().slice(0, max); }
@@ -33,6 +29,19 @@ function cleanContact(input) {
   if (!c.name) return { error: "contact name is required" };
   if (c.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c.email)) return { error: "invalid email address" };
   return { contact: c };
+}
+
+// Bindly may return a created/updated contact either bare or wrapped in
+// { contact: {...} } — normalize so the UI always gets a flat object.
+function unwrap(data, fallback) {
+  var c = (data && data.contact) || data || {};
+  return {
+    id: c.id || fallback.id || "",
+    name: c.name != null ? c.name : fallback.name,
+    role: c.role != null ? c.role : fallback.role,
+    email: c.email != null ? c.email : fallback.email,
+    phone: c.phone != null ? c.phone : fallback.phone
+  };
 }
 
 exports.handler = async function (event) {
@@ -49,37 +58,35 @@ exports.handler = async function (event) {
 
   try {
     if (method === "GET") {
-      // TODO(DB): const contacts = await db.query(
-      //   "select id, name, role, email, phone from portal_contacts where bindly_client_id = $1 order by created_at",
-      //   [ctx.bindlyClientId]);
-      return respond.json(200, { contacts: [] }); // stub
+      var data = await bindly.getContacts(ctx.bindlyClientId);
+      var raw = (data && data.contacts) || [];
+      var contacts = raw.map(function (c) {
+        return { id: c.id || "", name: c.name || "", role: c.role || "", email: c.email || "", phone: c.phone || "" };
+      });
+      return respond.json(200, { contacts: contacts });
     }
 
     if (method === "POST") {
-      var data;
-      try { data = JSON.parse(event.body || "{}"); }
+      var pd;
+      try { pd = JSON.parse(event.body || "{}"); }
       catch (e2) { return respond.json(400, { error: "invalid json" }); }
-      var checked = cleanContact(data);
+      var checked = cleanContact(pd);
       if (checked.error) return respond.json(400, { error: checked.error });
-      // TODO(DB): const contact = await db.query(
-      //   "insert into portal_contacts (bindly_client_id, name, role, email, phone) values ($1,$2,$3,$4,$5) returning *",
-      //   [ctx.bindlyClientId, checked.contact.name, checked.contact.role, checked.contact.email, checked.contact.phone]);
-      var created = checked.contact;
-      created.id = "stub-" + Date.now();
+      var addResp = await bindly.addContact(ctx.bindlyClientId, checked.contact);
+      var created = unwrap(addResp, checked.contact);
       audit.log({ action: "contact_added", actor: ctx.authUserId, bindlyClientId: ctx.bindlyClientId, target: created.id });
       return respond.json(201, { ok: true, contact: created });
     }
 
     if (method === "PUT") {
       if (!id) return respond.json(400, { error: "id query param is required" });
-      var updates;
-      try { updates = JSON.parse(event.body || "{}"); }
+      var ud;
+      try { ud = JSON.parse(event.body || "{}"); }
       catch (e3) { return respond.json(400, { error: "invalid json" }); }
-      var checkedPut = cleanContact(updates);
+      var checkedPut = cleanContact(ud);
       if (checkedPut.error) return respond.json(400, { error: checkedPut.error });
-      // TODO(DB): update the row WHERE id = $1 AND bindly_client_id = $2 (never trust
-      // an id alone — always scope the update to the caller's own client).
-      var updated = checkedPut.contact;
+      var updResp = await bindly.updateContact(ctx.bindlyClientId, id, checkedPut.contact);
+      var updated = unwrap(updResp, checkedPut.contact);
       updated.id = id;
       audit.log({ action: "contact_updated", actor: ctx.authUserId, bindlyClientId: ctx.bindlyClientId, target: id });
       return respond.json(200, { ok: true, contact: updated });
@@ -87,7 +94,7 @@ exports.handler = async function (event) {
 
     // DELETE
     if (!id) return respond.json(400, { error: "id query param is required" });
-    // TODO(DB): delete WHERE id = $1 AND bindly_client_id = $2 (same scoping rule).
+    await bindly.removeContact(ctx.bindlyClientId, id);
     audit.log({ action: "contact_removed", actor: ctx.authUserId, bindlyClientId: ctx.bindlyClientId, target: id });
     return respond.json(200, { ok: true });
   } catch (e) {

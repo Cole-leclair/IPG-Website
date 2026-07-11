@@ -13,6 +13,16 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap">
 <!-- Shares the main site's design so it stays in sync automatically -->
 <link rel="stylesheet" href="../assets/styles.css">
+<!-- Clerk auth (Phase 1). The publishable key is public and safe to expose.
+     A pk_test_ (development) key only activates real login on localhost; the
+     deployed portal at ipg.team stays in preview mode until a production
+     pk_live_ key is set (see PORTAL_CONFIG + CLERK_ENABLED in portal.js). -->
+<script
+  async crossorigin="anonymous"
+  data-clerk-publishable-key="pk_test_ZXhjaXRpbmctb3lzdGVyLTc1LmNsZXJrLmFjY291bnRzLmRldiQ"
+  src="https://exciting-oyster-75.clerk.accounts.dev/npm/@clerk/clerk-js@5/dist/clerk.browser.js"
+  type="text/javascript"
+></script>
 <style>
   /* hidden must beat class display rules (.portal-auth is display:flex) */
   [hidden] { display: none !important; }
@@ -91,6 +101,21 @@
   .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
   .form-field.full { grid-column: 1 / -1; }
   .lbl-hint { font-weight: 400; color: var(--slate); font-size: 12px; }
+  /* ---- Admin: invite form + confirm ---- */
+  #inviteForm select, #teamInviteForm select { width: 100%; padding: 11px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--white); font: inherit; color: var(--ink); }
+  .invite-confirm { margin-top: 6px; border: 1px solid var(--line); border-radius: 12px; padding: 20px 22px; background: var(--paper); }
+  .invite-confirm h3 { margin: 0 0 14px; font-size: 15px; }
+  .invite-confirm-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+  .you-tag { flex-shrink: 0; font-size: 12px; font-weight: 600; color: var(--slate); }
+  .panel-head-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  /* ---- Popup / modal (used by "Add a team member") ---- */
+  .portal-modal { position: fixed; inset: 0; z-index: 200; display: flex; align-items: center; justify-content: center; padding: 20px; }
+  .portal-modal-backdrop { position: absolute; inset: 0; background: rgba(20,28,38,0.45); }
+  .portal-modal-card { position: relative; z-index: 1; width: 100%; max-width: 440px; background: var(--white); border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 16px 48px rgba(0,0,0,0.24); padding: 24px 26px; max-height: 90vh; overflow-y: auto; }
+  .portal-modal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+  .portal-modal-head h3 { margin: 0; font-size: 17px; }
+  .portal-modal-x { background: none; border: 0; font-size: 26px; line-height: 1; color: var(--slate); cursor: pointer; padding: 0 4px; }
+  .portal-modal-x:hover { color: var(--ink); }
   /* ---- Account ---- */
   .acct-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 28px; }
   .acct-item .k { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--slate); font-weight: 600; }
@@ -121,6 +146,7 @@
     <div id="previewEntry" hidden>
       <button id="demoPersonal" class="btn btn-primary" type="button">View demo — Personal client</button>
       <button id="demoCommercial" class="btn btn-outline" type="button">View demo — Business client</button>
+      <button id="demoAdmin" class="btn btn-outline" type="button">View demo — IPG Admin</button>
     </div>
     <form id="loginForm" novalidate>
       <div class="form-field"><label for="plEmail">Email</label><input id="plEmail" type="email" autocomplete="email" required></div>
@@ -128,7 +154,33 @@
       <button class="btn btn-primary" type="submit">Sign In</button>
       <p class="portal-msg" id="loginMsg" aria-live="polite"></p>
     </form>
+    <!-- Shown only when Clerk needs a one-time email/authenticator code. -->
+    <form id="twoFactorForm" novalidate hidden>
+      <div class="form-field">
+        <label for="tfCode">Verification code</label>
+        <input id="tfCode" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" required>
+      </div>
+      <button class="btn btn-primary" type="submit">Verify &amp; sign in</button>
+      <p class="portal-msg" id="tfMsg" aria-live="polite"></p>
+    </form>
     <p class="portal-help">Accounts are set up by IPG. Need access? <a href="/contact/">Contact us</a> or call (214)&nbsp;377-1460.</p>
+  </div>
+</section>
+
+<!-- ACCEPT-INVITE VIEW — shown when someone arrives from an invite email to set
+     their password. Handled natively here (no Clerk-hosted page). -->
+<section id="portalAccept" class="portal-auth" hidden>
+  <div class="portal-card">
+    <img class="logo-img" src="../assets/logo.png" alt="Insurance Partner Group">
+    <h1 id="acceptTitle">Set your password</h1>
+    <p class="portal-sub" id="acceptSub">Create a password to finish setting up your IPG account.</p>
+    <form id="acceptForm" novalidate>
+      <div class="form-field"><label for="acEmail">Email</label><input id="acEmail" type="email" autocomplete="username" readonly></div>
+      <div class="form-field"><label for="acPass">Password</label><input id="acPass" type="password" autocomplete="new-password" minlength="8" required></div>
+      <div class="form-field"><label for="acPass2">Confirm password</label><input id="acPass2" type="password" autocomplete="new-password" minlength="8" required></div>
+      <button class="btn btn-primary" type="submit">Set password &amp; sign in</button>
+      <p class="portal-msg" id="acceptMsg" aria-live="polite"></p>
+    </form>
   </div>
 </section>
 
@@ -144,6 +196,8 @@
     <button class="ptab" type="button" data-tab="documents">Documents</button>
     <button class="ptab" type="button" data-tab="certificates" id="certTab">Certificates</button>
     <button class="ptab" type="button" data-tab="account">Account</button>
+    <button class="ptab" type="button" data-tab="admin" id="adminTab" hidden>Clients</button>
+    <button class="ptab" type="button" data-tab="team" id="teamTab" hidden>Team</button>
   </nav>
 
   <main class="portal-main">
@@ -181,8 +235,12 @@
         <p class="portal-note" style="margin:0 0 14px;">Add who needs proof of insurance and we&rsquo;ll issue a certificate instantly using your standard coverage.</p>
         <form id="holderForm" novalidate>
           <div class="form-grid">
-            <div class="form-field"><label for="hName">Holder name</label><input id="hName" type="text" maxlength="200" required></div>
-            <div class="form-field"><label for="hAddr">Holder address</label><input id="hAddr" type="text" maxlength="300"></div>
+            <div class="form-field full"><label for="hName">Holder name</label><input id="hName" type="text" maxlength="200" required></div>
+            <div class="form-field full"><label for="hAddr1">Street address</label><input id="hAddr1" type="text" maxlength="120" required></div>
+            <div class="form-field"><label for="hAddr2">Suite / unit <span class="lbl-hint">(optional)</span></label><input id="hAddr2" type="text" maxlength="120"></div>
+            <div class="form-field"><label for="hCity">City</label><input id="hCity" type="text" maxlength="80" required></div>
+            <div class="form-field"><label for="hState">State</label><input id="hState" type="text" maxlength="20" required></div>
+            <div class="form-field"><label for="hZip">ZIP</label><input id="hZip" type="text" maxlength="20" required></div>
           </div>
           <button class="btn btn-primary btn-sm" type="submit">Add holder</button>
           <p class="portal-msg" id="holderMsg" aria-live="polite"></p>
@@ -222,9 +280,96 @@
         </form>
       </div>
     </div>
+
+    <!-- ADMIN (staff/admin only — hidden for clients) -->
+    <div class="ptab-panel" data-panel="admin" hidden>
+      <div class="portal-panel">
+        <h2>Add a client login</h2>
+        <p class="portal-note" style="margin:0 0 16px;">Create a portal login for a client. They&rsquo;ll get an email to set their own password &mdash; nothing to hand over. <span id="ivBindlyHint">Enter the client&rsquo;s Bindly ID for now; once Bindly&rsquo;s email lookup is connected, we&rsquo;ll auto-detect it from the email.</span></p>
+
+        <!-- Step 1: details -->
+        <form id="inviteForm" novalidate>
+          <div class="form-grid">
+            <div class="form-field"><label for="ivEmail">Client email</label><input id="ivEmail" type="email" maxlength="254" autocomplete="off" required></div>
+            <div class="form-field"><label for="ivName">Name <span class="lbl-hint">(optional)</span></label><input id="ivName" type="text" maxlength="120"></div>
+            <div class="form-field"><label for="ivClient">Bindly client ID</label><input id="ivClient" type="text" maxlength="120" required></div>
+            <div class="form-field"><label for="ivType">Account type</label>
+              <select id="ivType" required>
+                <option value="personal">Personal</option>
+                <option value="commercial">Commercial</option>
+              </select>
+            </div>
+          </div>
+          <button class="btn btn-primary btn-sm" type="submit">Review &amp; send invite</button>
+          <p class="portal-msg" id="inviteMsg" aria-live="polite"></p>
+        </form>
+
+        <!-- Step 2: confirm the client before the invite goes out -->
+        <div id="inviteConfirm" class="invite-confirm" hidden>
+          <h3>Confirm this client</h3>
+          <div class="acct-grid" id="inviteConfirmBody"></div>
+          <p class="portal-note" id="inviteConfirmWarn" style="margin:14px 0 16px;">Double-check this is the right client &mdash; sending links this login to the Bindly record above.</p>
+          <div class="invite-confirm-actions">
+            <button class="btn btn-primary btn-sm" type="button" id="inviteSendBtn">Send invite</button>
+            <button class="btn btn-outline btn-sm" type="button" id="inviteBackBtn">Back</button>
+          </div>
+          <p class="portal-msg" id="inviteConfirmMsg" aria-live="polite"></p>
+        </div>
+      </div>
+
+      <div class="portal-panel">
+        <div class="panel-head"><h2>Client logins</h2><button class="btn btn-outline btn-sm" type="button" id="usersRefresh">Refresh</button></div>
+        <p class="portal-note" style="margin:0 0 14px;"><strong>Invited</strong> = emailed, hasn&rsquo;t finished setup. <strong>Active</strong> = signed in and ready.</p>
+        <ul class="doc-list" id="userList"></ul>
+      </div>
+
+    </div>
+
+    <!-- TEAM (admins only — its own tab, kept off the main Clients page). Adding
+         a member is rare, so the invite form is a popup behind a "+ Add" button. -->
+    <div class="ptab-panel" data-panel="team" hidden>
+      <div class="portal-panel" id="teamListPanel">
+        <div class="panel-head">
+          <h2>Team members</h2>
+          <span class="panel-head-actions">
+            <button class="btn btn-outline btn-sm" type="button" id="teamRefresh">Refresh</button>
+            <button class="btn btn-primary btn-sm" type="button" id="teamAddBtn">+ Add</button>
+          </span>
+        </div>
+        <p class="portal-note" style="margin:0 0 14px;">People who can sign in to this admin area. <strong>Staff</strong> manage clients; <strong>Admins</strong> can also add team members.</p>
+        <ul class="doc-list" id="teamList"></ul>
+      </div>
+
+      <!-- Add-team-member popup (opened by the "+ Add" button above) -->
+      <div class="portal-modal" id="teamModal" hidden>
+        <div class="portal-modal-backdrop" data-close-team></div>
+        <div class="portal-modal-card" role="dialog" aria-modal="true" aria-labelledby="teamModalTitle">
+          <div class="portal-modal-head">
+            <h3 id="teamModalTitle">Add a team member</h3>
+            <button class="portal-modal-x" type="button" data-close-team aria-label="Close">&times;</button>
+          </div>
+          <p class="portal-note" style="margin:0 0 16px;">They&rsquo;ll get an email to set their own password. <strong>Staff</strong> can add &amp; manage clients; <strong>Admins</strong> can also add team members.</p>
+          <form id="teamInviteForm" novalidate>
+            <div class="form-field"><label for="tmEmail">Email</label><input id="tmEmail" type="email" maxlength="254" autocomplete="off" required></div>
+            <div class="form-field"><label for="tmName">Name <span class="lbl-hint">(optional)</span></label><input id="tmName" type="text" maxlength="120"></div>
+            <div class="form-field"><label for="tmRole">Access level</label>
+              <select id="tmRole" required>
+                <option value="staff">Staff — can add &amp; manage clients</option>
+                <option value="admin">Admin — can also add team members</option>
+              </select>
+            </div>
+            <div class="invite-confirm-actions" style="margin-top:8px;">
+              <button class="btn btn-primary btn-sm" type="submit">Send invite</button>
+              <button class="btn btn-outline btn-sm" type="button" data-close-team>Cancel</button>
+            </div>
+            <p class="portal-msg" id="teamMsg" aria-live="polite"></p>
+          </form>
+        </div>
+      </div>
+    </div>
   </main>
 </div>
 
-<script src="portal.js?v=6"></script>
+<script src="portal.js?v=22"></script>
 </body>
 </html>

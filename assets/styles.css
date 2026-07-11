@@ -627,6 +627,10 @@
   .foot-links a:hover { color: var(--ipg-blue); }
   .foot-bottom { display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; color: var(--slate-soft); flex-wrap: wrap; gap: 10px; }
   footer address { font-style: normal; }
+  /* Discreet staff/admin entry point — muted, sits inline with the copyright. */
+  .foot-sep { margin: 0 6px; opacity: 0.5; }
+  .foot-staff { color: var(--slate-soft); text-decoration: none; }
+  .foot-staff:hover { color: var(--ipg-blue); }
 
   .reveal { opacity: 0; transform: translateY(14px); transition: opacity 0.6s ease, transform 0.6s ease; }
   .reveal.in { opacity: 1; transform: translateY(0); }
