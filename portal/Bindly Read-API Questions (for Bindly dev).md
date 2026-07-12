@@ -68,3 +68,15 @@ while testing real client invites that look like bugs on Bindly's side rather th
     how long should we expect staff to wait after adding a client before they can invite
     them through our portal, and is there a faster path (e.g. querying by exact `client_id`
     instead of search) that doesn't hit that delay?
+
+## Follow-up (2026-07-12) — Producer / CSR field
+
+13. **★ Producer and CSR fields.** We're adding a "Your Producer" and "Your CSR" card to
+    the client's Account tab, sourced from whatever assigns those roles on the client
+    record in Bindly. Two things we need: (1) the **exact key name(s)** for Producer and
+    CSR on `GET /clients/{client_id}` (e.g. is it `producer` / `csr`, something nested
+    under a `team` or `assigned_to` object, or something else?), and (2) the **shape** of
+    the value — is it just a plain name string, or an object with name/phone/email? If
+    Bindly only sends a name (no direct phone/email), that's fine — we already maintain
+    our own internal directory to fill in contact info by name — we just need the field
+    to reliably carry the correct name as it appears in your dashboard.
