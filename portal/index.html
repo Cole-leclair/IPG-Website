@@ -46,8 +46,28 @@
   .portal-msg { font-size: 13px; margin: 12px 0 0; min-height: 1em; }
   .portal-msg.err { color: #b23b3b; }
   .portal-msg.ok { color: #1e7a3d; }
+  /* ---- Public site header (login / set-password screens) ---- */
+  /* Reuses the main site's .nav/.brand/.nav-links classes so it matches ipg.team.
+     No hamburger here (portal doesn't load the site's menu JS), so force the nav
+     links to stay visible and wrap on narrow screens instead of collapsing. */
+  .portal-site-header { background: var(--white); border-bottom: 1px solid var(--line); }
+  .portal-site-header .nav { padding: 10px 32px; }
+  .portal-site-header .logo-img { height: 54px; }
+  .portal-site-header .nav-links { display: flex !important; flex-wrap: wrap; row-gap: 6px; }
+  @media (max-width: 760px) {
+    .portal-site-header .nav { padding: 10px 18px; gap: 12px; }
+    .portal-site-header .nav-links { gap: 8px 16px; font-size: 13px; }
+    .portal-site-header .logo-img { height: 46px; }
+  }
+  @media (max-width: 480px) {
+    /* on very small screens keep just the logo + Get a Quote to avoid clutter */
+    .portal-site-header .nav-links { display: none !important; }
+  }
   /* ---- Chrome ---- */
   .portal-header { position: sticky; top: var(--flag-h); z-index: 40; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 32px; background: rgba(244,246,250,0.92); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
+  .portal-header-left { display: flex; align-items: center; gap: 20px; }
+  .portal-back { font-size: 13.5px; font-weight: 600; color: var(--ipg-blue); text-decoration: none; white-space: nowrap; }
+  .portal-back:hover { text-decoration: underline; }
   .portal-header .logo-img { height: 50px; }
   .portal-user { display: flex; align-items: center; gap: 14px; font-size: 14px; font-weight: 600; color: var(--ink); }
   .btn-sm { padding: 8px 16px; font-size: 13px; }
@@ -134,6 +154,28 @@
 
 <div class="portal-flag">IPG Client Portal — preview build (not yet connected to live accounts)</div>
 
+<!-- PUBLIC SITE HEADER — shown on the login / set-password screens so the portal
+     reads as part of ipg.team, not a separate app. portal.js hides it once the
+     client is signed in (the dashboard has its own header). Links are absolute
+     so they resolve to the main site from under /portal/. -->
+<header class="portal-site-header" id="portalSiteHeader">
+  <nav class="nav" aria-label="Primary">
+    <a class="brand" href="/"><img class="logo-img" src="/assets/logo.png" alt="Insurance Partner Group"></a>
+    <div class="nav-links">
+      <a href="/">Home</a>
+      <a href="/personal-insurance/">Personal</a>
+      <a href="/business-insurance/">Business</a>
+      <a href="/employee-benefits/">Benefits</a>
+      <a href="/service-center/">Service</a>
+      <a href="/about/">About</a>
+      <a href="/contact/">Contact</a>
+    </div>
+    <div class="nav-cta">
+      <a class="btn btn-primary" href="/contact/">Get a Quote</a>
+    </div>
+  </nav>
+</header>
+
 <!-- LOGIN VIEW -->
 <section id="portalLogin" class="portal-auth">
   <div class="portal-card">
@@ -188,7 +230,10 @@
 <!-- DASHBOARD VIEW -->
 <div id="portalApp" hidden>
   <header class="portal-header">
-    <a class="brand" href="./"><img class="logo-img" src="../assets/logo.png" alt="IPG"></a>
+    <div class="portal-header-left">
+      <a class="brand" href="./"><img class="logo-img" src="../assets/logo.png" alt="IPG"></a>
+      <a class="portal-back" href="/">&larr; Main site</a>
+    </div>
     <div class="portal-user"><span id="pUser">Client</span><button id="signOut" class="btn btn-outline btn-sm" type="button">Sign out</button></div>
   </header>
 
@@ -373,6 +418,6 @@
   </main>
 </div>
 
-<script src="portal.js?v=26"></script>
+<script src="portal.js?v=27"></script>
 </body>
 </html>

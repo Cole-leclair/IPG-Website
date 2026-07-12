@@ -395,6 +395,15 @@
   var loginForm = $("loginForm");
   var loginMsg = $("loginMsg");
 
+  // The public ipg.team site header (logo + nav + Get a Quote) shows on the
+  // login and set-password screens so the portal reads as part of the main
+  // website; it's hidden inside the signed-in dashboard, which has its own
+  // header. Call with `true` on any public view, `false` when the app is shown.
+  function siteHeader(show) {
+    var h = $("portalSiteHeader");
+    if (h) h.hidden = !show;
+  }
+
   function cleanDocName(name) {
     return (name || "").replace(/\s*[—-]\s*\d{4}(\.\w+)?$/, "").replace(/\.\w+$/, "");
   }
@@ -1009,6 +1018,7 @@
   function showAdmin(user) {
     loginView.hidden = true;
     appView.hidden = false;
+    siteHeader(false);
     // Team management is admin-only (staff can only manage clients).
     adminIsAdmin = adminPreview || !!(user && user.role === "admin");
     adminSelfId = (user && user.id) || (adminPreview ? "t-self" : null);
@@ -1032,6 +1042,7 @@
 
     loginView.hidden = true;
     appView.hidden = false;
+    siteHeader(false);
 
     // Header + greeting adapt to the client type.
     $("pUser").textContent = (client && (client.company || client.name)) || "Client";
@@ -1143,6 +1154,7 @@
       PortalData.logout().then(function () {
         appView.hidden = true;
         loginView.hidden = false;
+        siteHeader(true);
         if (loginForm) loginForm.reset();
         window.scrollTo(0, 0);
       });
@@ -1218,6 +1230,7 @@
     if (loginView) loginView.hidden = true;
     if (appView) appView.hidden = true;
     if (acceptView) acceptView.hidden = false;
+    siteHeader(true);
     window.scrollTo(0, 0);
   }
   function acceptError(msg) {
@@ -1272,6 +1285,7 @@
       // Signed out — show the native login form (reset any code step).
       appView.hidden = true;
       loginView.hidden = false;
+      siteHeader(true);
       if (loginForm) loginForm.hidden = false;
       if (twoFactorForm) twoFactorForm.hidden = true;
       window.scrollTo(0, 0);
