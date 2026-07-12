@@ -100,8 +100,8 @@
   .stat-card { background: var(--white); border: 1px solid var(--line); border-radius: 14px; padding: 20px 22px; box-shadow: var(--shadow-card); }
   .stat-card .num { font-size: 30px; font-weight: 700; color: var(--ipg-blue); line-height: 1.1; }
   .stat-card .lbl { font-size: 13px; color: var(--slate); margin-top: 4px; }
-  .stat-card[data-goto] { cursor: pointer; }
-  .stat-card[data-goto]:hover { border-color: var(--ipg-blue); }
+  .stat-card[data-goto], .stat-card[data-renew-stat] { cursor: pointer; }
+  .stat-card[data-goto]:hover, .stat-card[data-renew-stat]:hover { border-color: var(--ipg-blue); }
   .quick-actions { display: flex; gap: 10px; flex-wrap: wrap; margin: -14px 0 28px; }
   /* ---- Panels & lists ---- */
   .portal-panel { background: var(--white); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow-card); padding: 24px 26px; margin-bottom: 22px; }
@@ -124,16 +124,65 @@
   .doc-empty { font-size: 14px; color: var(--slate); }
   .portal-toast { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); background: var(--ink, #23303f); color: #fff; font-size: 13.5px; line-height: 1.45; padding: 11px 18px; border-radius: 10px; box-shadow: 0 6px 24px rgba(0,0,0,0.18); z-index: 120; max-width: min(90vw, 420px); text-align: center; opacity: 0; transition: opacity 0.25s ease; pointer-events: none; }
   .portal-toast.show { opacity: 1; }
-  /* ---- Policy rows ---- */
-  .policy-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
-  .policy-list li { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 16px 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); }
-  .policy-info { display: flex; flex-direction: column; min-width: 0; }
-  .policy-info .n { font-weight: 600; font-size: 15px; color: var(--ink); }
-  .policy-info .m { font-size: 12.5px; color: var(--slate); margin-top: 2px; }
+  /* ---- Policy cards (expandable) ---- */
+  .policy-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+  .policy-card { border: 1px solid var(--line); border-radius: 14px; background: var(--white); overflow: hidden; transition: border-color .18s ease, box-shadow .18s ease; }
+  .policy-card:hover { border-color: #d8cdb8; }
+  .policy-card.open { border-color: var(--ipg-blue); box-shadow: var(--shadow-card); }
+  .policy-card.flash { animation: policy-flash 1.6s ease; }
+  @keyframes policy-flash { 0%,100% { box-shadow: none; } 25% { box-shadow: 0 0 0 3px rgba(201,138,43,0.35); } }
+  .policy-summary { width: 100%; display: flex; align-items: center; gap: 14px; padding: 16px 18px; background: none; border: 0; font: inherit; text-align: left; cursor: pointer; }
+  .policy-icon { flex-shrink: 0; width: 42px; height: 42px; border-radius: 11px; background: var(--honey-soft); color: var(--ipg-blue); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; letter-spacing: .02em; }
+  .policy-info { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+  .policy-info .n { font-weight: 600; font-size: 15.5px; color: var(--ink); }
+  .policy-info .m { font-size: 12.5px; color: var(--slate); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .policy-tags { display: flex; align-items: center; gap: 8px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
+  .policy-caret { flex-shrink: 0; color: var(--slate-soft); transition: transform .2s ease; display: flex; }
+  .policy-caret svg { width: 18px; height: 18px; }
+  .policy-card.open .policy-caret { transform: rotate(180deg); }
+  .policy-body { padding: 4px 18px 18px; border-top: 1px solid var(--line); }
+  .pcov-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 22px; margin: 16px 0 0; }
+  .pcov-item { display: flex; flex-direction: column; gap: 2px; }
+  .pcov-item .k { font-size: 11.5px; text-transform: uppercase; letter-spacing: .03em; color: var(--slate); font-weight: 600; }
+  .pcov-item .v { font-size: 15px; color: var(--ink); font-weight: 600; }
+  .policy-term { font-size: 12.5px; color: var(--slate); margin-top: 16px; }
+  .pcov-empty { font-size: 13px; color: var(--slate); margin-top: 14px; }
+  .chip { flex-shrink: 0; font-size: 12px; font-weight: 600; padding: 4px 11px; border-radius: 999px; white-space: nowrap; }
+  .chip.renew { background: var(--honey-soft); color: #9a6a1c; }
+  .chip.renew.urgent { background: #fbe6e2; color: #b23b3b; }
+  .chip.neutral { background: #eef1f5; color: var(--slate); }
   .badge { flex-shrink: 0; font-size: 12px; font-weight: 600; padding: 4px 11px; border-radius: 999px; white-space: nowrap; }
   .badge.active { background: #e6f4ea; color: #1e7a3d; }
   .badge.pending { background: var(--honey-soft, #F6ECD7); color: #9a6a1c; }
   .badge.issued { background: #e7effb; color: var(--ipg-blue); }
+  .badge.expired { background: #eef1f5; color: var(--slate); }
+  /* ---- Documents: search + category groups ---- */
+  .doc-search { position: relative; margin: 4px 0 20px; }
+  .doc-search-ico { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); width: 17px; height: 17px; color: var(--slate-soft); pointer-events: none; }
+  .doc-search input { width: 100%; padding: 11px 14px 11px 40px; border: 1px solid var(--line); border-radius: 10px; background: var(--white); font: inherit; font-size: 14px; color: var(--ink); }
+  .doc-search input:focus { outline: none; border-color: var(--ipg-blue); }
+  .doc-group { margin-bottom: 22px; }
+  .doc-group:last-child { margin-bottom: 0; }
+  .doc-group-head { display: flex; align-items: baseline; gap: 8px; margin: 0 0 10px; }
+  .doc-group-head .lbl { font-size: 13px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; color: var(--ink); }
+  .doc-group-head .cnt { font-size: 12px; color: var(--slate-soft); font-weight: 600; }
+  /* ---- Certificates: explainer ---- */
+  .cert-explainer { background: var(--honey-soft); border: 1px solid #ecdcbb; border-radius: 14px; padding: 18px 22px; margin-bottom: 22px; }
+  .cert-explainer h3 { margin: 0 0 6px; font-size: 15px; color: var(--ink); }
+  .cert-explainer p { margin: 0; font-size: 13.5px; line-height: 1.55; color: var(--slate); }
+  /* ---- Account: assigned agent ---- */
+  .agent-card { display: flex; align-items: center; gap: 16px; background: linear-gradient(135deg, #f0f5fc, #ffffff); border: 1px solid #d9e4f4; border-radius: 16px; padding: 20px 24px; margin-bottom: 22px; box-shadow: var(--shadow-card); }
+  .agent-avatar { flex-shrink: 0; width: 52px; height: 52px; border-radius: 50%; background: var(--ipg-blue); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 19px; font-weight: 700; }
+  .agent-meta { min-width: 0; display: flex; flex-direction: column; }
+  .agent-meta .role { display: block; font-size: 11.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--slate); font-weight: 600; }
+  .agent-meta .name { display: block; font-size: 17px; font-weight: 700; color: var(--ink); margin: 2px 0 6px; }
+  .agent-links { display: flex; gap: 8px 18px; flex-wrap: wrap; }
+  .agent-links a { font-size: 13.5px; font-weight: 600; color: var(--ipg-blue); text-decoration: none; }
+  .agent-links a:hover { text-decoration: underline; }
+  /* ---- Service form (textarea / select share the input look) ---- */
+  .portal-panel textarea, #serviceForm select, #svcTopic { width: 100%; padding: 11px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--white); font: inherit; font-size: 14px; color: var(--ink); resize: vertical; }
+  .portal-panel textarea:focus, #serviceForm select:focus { outline: none; border-color: var(--ipg-blue); }
+  #holderForm select { width: 100%; padding: 11px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--white); font: inherit; color: var(--ink); }
   /* ---- Certificates: add-holder form ---- */
   .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
   .form-field.full { grid-column: 1 / -1; }
@@ -159,10 +208,21 @@
   .acct-item .v { font-size: 15px; color: var(--ink); margin-top: 3px; }
   @media (max-width: 620px) {
     .stat-grid { grid-template-columns: 1fr; }
-    .form-grid, .acct-grid { grid-template-columns: 1fr; }
+    .form-grid, .acct-grid, .pcov-grid { grid-template-columns: 1fr; }
     .portal-header, .portal-tabs { padding-left: 18px; padding-right: 18px; }
+    /* On phones the client/company name would collide with "← Main site";
+       drop it (the dashboard greeting already names them) and keep the logo,
+       back link, and Sign out. */
+    .portal-header .logo-img { height: 40px; }
+    .portal-header-left { gap: 12px; }
+    #pUser { display: none; }
     /* let long document names wrap to two lines instead of hard-truncating */
     .doc-meta .n { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+    /* stack the policy summary so tags/caret don't crowd the name on phones */
+    .policy-summary { flex-wrap: wrap; }
+    .policy-info { flex-basis: calc(100% - 56px); }
+    .policy-tags { width: 100%; justify-content: flex-start; padding-left: 56px; }
+    .agent-card { flex-direction: column; align-items: flex-start; }
   }
 </style>
 </head>
@@ -260,6 +320,7 @@
     <button class="ptab active" type="button" data-tab="overview">Overview</button>
     <button class="ptab" type="button" data-tab="documents">Documents</button>
     <button class="ptab" type="button" data-tab="certificates" id="certTab">Certificates</button>
+    <button class="ptab" type="button" data-tab="service">Service</button>
     <button class="ptab" type="button" data-tab="account">Account</button>
     <button class="ptab" type="button" data-tab="admin" id="adminTab" hidden>Clients</button>
     <button class="ptab" type="button" data-tab="team" id="teamTab" hidden>Team</button>
@@ -280,6 +341,7 @@
       <div class="portal-panel">
         <h2>Your Policies</h2>
         <ul class="policy-list" id="policyList"></ul>
+        <p class="portal-note" id="policyDisclaimer" hidden>Coverage shown is a summary for reference — your policy documents control.</p>
       </div>
     </div>
 
@@ -287,13 +349,23 @@
     <div class="ptab-panel" data-panel="documents" hidden>
       <div class="portal-panel">
         <h2>Your Documents</h2>
-        <p class="portal-note" style="margin-top:0;">Policies, ID cards, and declaration pages on file with IPG.</p>
-        <ul class="doc-list" id="docList"></ul>
+        <p class="portal-note" style="margin-top:0;">Policies, ID cards, declaration pages, and more on file with IPG.</p>
+        <div class="doc-search">
+          <svg class="doc-search-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+          <input id="docSearch" type="search" placeholder="Search documents…" autocomplete="off" aria-label="Search documents">
+        </div>
+        <div id="docGroups"></div>
       </div>
     </div>
 
     <!-- CERTIFICATES -->
     <div class="ptab-panel" data-panel="certificates" hidden>
+      <!-- What the certificate shows -->
+      <div class="cert-explainer">
+        <h3>What your certificate shows</h3>
+        <p>Each certificate is a standard ACORD 25 built from your active coverage — the same limits your agent would put on it. You provide who needs proof of insurance (the “holder”); we fill in your coverage automatically. Certificates issue instantly and are also saved to your documents.</p>
+      </div>
+
       <!-- Add a holder -->
       <div class="portal-panel">
         <h2>Add a certificate holder</h2>
@@ -304,7 +376,21 @@
             <div class="form-field full"><label for="hAddr1">Street address</label><input id="hAddr1" type="text" maxlength="120" required></div>
             <div class="form-field"><label for="hAddr2">Suite / unit <span class="lbl-hint">(optional)</span></label><input id="hAddr2" type="text" maxlength="120"></div>
             <div class="form-field"><label for="hCity">City</label><input id="hCity" type="text" maxlength="80" required></div>
-            <div class="form-field"><label for="hState">State</label><input id="hState" type="text" maxlength="20" required></div>
+            <div class="form-field"><label for="hState">State</label>
+              <select id="hState" required>
+                <option value="" disabled selected>State</option>
+                <option>AL</option><option>AK</option><option>AZ</option><option>AR</option><option>CA</option>
+                <option>CO</option><option>CT</option><option>DE</option><option>DC</option><option>FL</option>
+                <option>GA</option><option>HI</option><option>ID</option><option>IL</option><option>IN</option>
+                <option>IA</option><option>KS</option><option>KY</option><option>LA</option><option>ME</option>
+                <option>MD</option><option>MA</option><option>MI</option><option>MN</option><option>MS</option>
+                <option>MO</option><option>MT</option><option>NE</option><option>NV</option><option>NH</option>
+                <option>NJ</option><option>NM</option><option>NY</option><option>NC</option><option>ND</option>
+                <option>OH</option><option>OK</option><option>OR</option><option>PA</option><option>RI</option>
+                <option>SC</option><option>SD</option><option>TN</option><option>TX</option><option>UT</option>
+                <option>VT</option><option>VA</option><option>WA</option><option>WV</option><option>WI</option><option>WY</option>
+              </select>
+            </div>
             <div class="form-field"><label for="hZip">ZIP</label><input id="hZip" type="text" maxlength="20" required></div>
           </div>
           <button class="btn btn-primary btn-sm" type="submit">Add holder</button>
@@ -319,8 +405,36 @@
       </div>
     </div>
 
+    <!-- SERVICE -->
+    <div class="ptab-panel" data-panel="service" hidden>
+      <div class="portal-panel">
+        <h2>Request a change</h2>
+        <p class="portal-note" style="margin:0 0 16px;">Need to update something on your account? Send it here and your IPG service team will take care of it. For anything urgent, call <a href="tel:+12143771460">(214)&nbsp;377-1460</a>.</p>
+        <form id="serviceForm" novalidate>
+          <div class="form-field"><label for="svcTopic">What do you need?</label>
+            <select id="svcTopic" required>
+              <option value="address">Update my mailing address</option>
+              <option value="driver_vehicle">Add or remove a driver / vehicle</option>
+              <option value="loss_runs">Request loss runs</option>
+              <option value="coverage">Add or change a coverage</option>
+              <option value="billing">Billing question</option>
+              <option value="other">Something else</option>
+            </select>
+          </div>
+          <div class="form-field"><label for="svcMessage">Details</label>
+            <textarea id="svcMessage" rows="5" maxlength="2000" required placeholder="Tell us what you need and we’ll follow up."></textarea>
+          </div>
+          <button class="btn btn-primary btn-sm" type="submit">Send request</button>
+          <p class="portal-msg" id="svcMsg" aria-live="polite"></p>
+        </form>
+      </div>
+    </div>
+
     <!-- ACCOUNT -->
     <div class="ptab-panel" data-panel="account" hidden>
+      <!-- Assigned agent — only rendered if Bindly returns one -->
+      <div class="agent-card" id="agentCard" hidden></div>
+
       <div class="portal-panel">
         <div class="panel-head"><h2>Account Details</h2></div>
         <div class="acct-grid" id="acctGrid"></div>
@@ -437,6 +551,6 @@
   </main>
 </div>
 
-<script src="portal.js?v=30"></script>
+<script src="portal.js?v=31"></script>
 </body>
 </html>

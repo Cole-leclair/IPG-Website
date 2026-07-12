@@ -1,10 +1,30 @@
 // GET /portal/me — the signed-in client's profile + account type.
 // Maps to PortalData.getAccount() in portal.js (shape: { name, company,
-// email, phone, address }).
+// email, phone, address, agent }).
 var auth = require("./utils/auth");
 var bindly = require("./utils/bindly");
 var respond = require("./utils/respond");
 var ratelimit = require("./utils/ratelimit");
+
+// Pull the assigned agent / producer off the profile IF Bindly sends one.
+// Bindly's documented profile fields don't yet include a producer (open
+// question to their dev), so this reads several likely shapes and simply
+// returns null when nothing is present — the UI hides the block in that case.
+function pickAgent(c) {
+  var a = c.agent || c.producer || c.account_manager || c.csr || null;
+  var name, phone, email;
+  if (a && typeof a === "object") {
+    name = a.name || a.full_name || "";
+    phone = a.phone || a.direct_line || a.direct || "";
+    email = a.email || "";
+  } else {
+    name = c.agent_name || c.producer_name || (typeof a === "string" ? a : "");
+    phone = c.agent_phone || c.producer_phone || c.agent_direct_line || "";
+    email = c.agent_email || c.producer_email || "";
+  }
+  if (!name && !phone && !email) return null;
+  return { name: name || "", phone: phone || "", email: email || "" };
+}
 
 // Format Bindly's address (string OR { address1/line1, address2/line2, city,
 // state, zip }) into one display line. Tolerant of either field naming so a
@@ -44,7 +64,8 @@ exports.handler = async function (event) {
         company: c.dba || c.company || "",
         email: c.email || "",
         phone: c.phone || "",
-        address: addr
+        address: addr,
+        agent: pickAgent(c)
       }
     });
   } catch (e) {

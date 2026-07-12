@@ -132,12 +132,16 @@
     removeContact: function (id) {
       return authedApi("/portal-contacts?id=" + encodeURIComponent(id), { method: "DELETE" });
     },
+    // Route a "request a change" to IPG's service team. Body: { topic, message }.
+    submitServiceRequest: function (data) {
+      return authedApi("/portal-service-request", { method: "POST", body: data });
+    },
     isCommercial: function () { return this._type === "commercial"; },
     logout: function () { return Promise.resolve(); }
   };
 
   // Local view state. Holders added in-session live here.
-  var state = { policies: [], holders: [], commercial: false, contacts: [] };
+  var state = { policies: [], holders: [], commercial: false, contacts: [], documents: [] };
 
   // =====================================================================
   // ADMIN DATA LAYER — the staff/admin tab (create + manage client logins).
@@ -212,6 +216,17 @@
   // =====================================================================
   var FILE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>';
   var PERSON_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a7 7 0 0 1 14 0v1"/></svg>';
+  var CARET_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
+
+  // Short abbreviation shown in a policy card's icon chip (e.g. "General
+  // Liability" -> "GL", "Workers Compensation" -> "WC"). Falls back to the
+  // first two letters for single-word lines.
+  function policyAbbrev(type) {
+    var words = String(type || "").trim().split(/\s+/).filter(Boolean);
+    if (!words.length) return "•";
+    if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+    return words.slice(0, 3).map(function (w) { return w[0]; }).join("").toUpperCase();
+  }
 
   function $(id) { return document.getElementById(id); }
   function esc(s) {
@@ -244,9 +259,11 @@
     return (name || "").replace(/\s*[—-]\s*\d{4}(\.\w+)?$/, "").replace(/\.\w+$/, "");
   }
   function docItem(d) {
+    // The category is shown as the group heading, so the row only needs the
+    // cleaned name + date.
     return '<li><span class="doc-ico">' + FILE_ICON + '</span>' +
       '<span class="doc-meta"><span class="n">' + esc(cleanDocName(d.name)) + '</span>' +
-      '<span class="m">' + esc(d.kind || "") + (d.date ? " · " + esc(d.date) : "") + '</span></span>' +
+      (d.date ? '<span class="m">' + esc(d.date) + '</span>' : '') + '</span>' +
       '<a class="doc-dl" href="' + esc(d.url || "#") + '"' + (d.url && d.url !== "#" ? ' download' : '') + '>Download</a></li>';
   }
   function renderDocs(el, items, emptyText) {
@@ -256,54 +273,182 @@
       : '<li class="doc-empty">' + esc(emptyText || "Nothing here yet.") + '</li>';
   }
 
+  // Documents grouped by Bindly category, in a sensible order, with a live
+  // search box that filters by document name. Renders into #docGroups.
+  var DOC_CATEGORY_ORDER = ["Policies", "ID Cards", "Declarations", "Dec Pages",
+    "COIs", "Cert Holders", "Loss Runs", "Quotes", "ACORD Apps", "Documents", "Miscellaneous"];
+  function docCategoryRank(cat) {
+    var i = DOC_CATEGORY_ORDER.indexOf(cat);
+    return i === -1 ? DOC_CATEGORY_ORDER.length : i;
+  }
+  function renderDocGroups(filter) {
+    var wrap = $("docGroups");
+    if (!wrap) return;
+    var q = (filter || "").trim().toLowerCase();
+    var docs = state.documents.filter(function (d) {
+      return !q || (cleanDocName(d.name) + " " + (d.name || "") + " " + (d.kind || "")).toLowerCase().indexOf(q) > -1;
+    });
+    if (!docs.length) {
+      wrap.innerHTML = '<ul class="doc-list"><li class="doc-empty">' +
+        (state.documents.length ? 'No documents match “' + esc(filter) + '”.' : 'No documents on file yet.') +
+        '</li></ul>';
+      return;
+    }
+    // Bucket by category, preserving first-seen order within each.
+    var groups = {};
+    docs.forEach(function (d) {
+      var cat = d.kind || "Documents";
+      (groups[cat] = groups[cat] || []).push(d);
+    });
+    var cats = Object.keys(groups).sort(function (a, b) {
+      var r = docCategoryRank(a) - docCategoryRank(b);
+      return r !== 0 ? r : a.localeCompare(b);
+    });
+    wrap.innerHTML = cats.map(function (cat) {
+      return '<div class="doc-group">' +
+        '<div class="doc-group-head"><span class="lbl">' + esc(cat) + '</span>' +
+          '<span class="cnt">' + groups[cat].length + '</span></div>' +
+        '<ul class="doc-list">' + groups[cat].map(docItem).join("") + '</ul>' +
+      '</div>';
+    }).join("");
+  }
+  function initDocSearch() {
+    var input = $("docSearch");
+    if (!input) return;
+    input.addEventListener("input", function () { renderDocGroups(input.value); });
+  }
+
   function statusBadge(status) {
-    // Only two statuses exist today: policies are "active", issued certs are
-    // "issued". (The old "received"/"in review" states went away with the
-    // review-routed cert flow — every holder now issues instantly.)
-    var map = { active: ["active", "Active"], issued: ["issued", "Issued"] };
-    var m = map[status] || ["pending", status || ""];
+    // Policy statuses are derived from the expiration date (active/expired);
+    // issued certs are "issued". (The old "received"/"in review" states went
+    // away with the review-routed cert flow — every holder issues instantly.)
+    var map = {
+      active: ["active", "Active"], issued: ["issued", "Issued"],
+      expired: ["expired", "Expired"], cancelled: ["expired", "Cancelled"], pending: ["pending", "Pending"]
+    };
+    var m = map[status] || ["pending", cap(status) || ""];
     return '<span class="badge ' + m[0] + '">' + esc(m[1]) + '</span>';
+  }
+
+  // The renewal chip: amber "Renews in X days" when a policy is renewing soon
+  // (turns red inside 14 days), otherwise a quiet "Renews {Mon YYYY}" — or
+  // nothing if we have no date. Skipped entirely for expired policies.
+  function renewalChip(p) {
+    if (p.status === "expired" || p.status === "cancelled") return "";
+    var d = p.daysToRenew;
+    if (p.renewsSoon && typeof d === "number" && d >= 0) {
+      var urgent = d <= 14 ? " urgent" : "";
+      var txt = d === 0 ? "Renews today" : d === 1 ? "Renews in 1 day" : "Renews in " + d + " days";
+      return '<span class="chip renew' + urgent + '">' + esc(txt) + '</span>';
+    }
+    if (p.expiration) return '<span class="chip neutral">Renews ' + esc(p.expiration) + '</span>';
+    return "";
   }
 
   function renderPolicies() {
     var el = $("policyList");
     if (!el) return;
-    el.innerHTML = state.policies.length ? state.policies.map(function (p) {
-      return '<li><span class="policy-info"><span class="n">' + esc(p.type) + '</span>' +
-        '<span class="m">' + esc(p.carrier || "") + " · #" + esc(p.number || "") + " · " + esc(p.term || "") + '</span></span>' +
-        statusBadge(p.status) + '</li>';
-    }).join("") : '<li class="doc-empty">No policies on file.</li>';
+    var disc = $("policyDisclaimer");
+    if (disc) disc.hidden = !state.policies.length;
+    if (!state.policies.length) {
+      el.innerHTML = '<li class="doc-empty">No policies on file.</li>';
+      return;
+    }
+    el.innerHTML = state.policies.map(function (p, i) {
+      var meta = [p.carrier, p.number ? "#" + p.number : ""].filter(Boolean).join(" · ");
+      var body;
+      if (p.coverages && p.coverages.length) {
+        body = '<div class="pcov-grid">' + p.coverages.map(function (c) {
+          return '<div class="pcov-item"><span class="k">' + esc(c.label) + '</span><span class="v">' + esc(c.value) + '</span></div>';
+        }).join("") + '</div>';
+      } else {
+        body = '<p class="pcov-empty">Coverage details aren’t available online for this policy — see your declarations page in Documents, or call us.</p>';
+      }
+      if (p.term) body += '<div class="policy-term">Policy term: ' + esc(p.term) + '</div>';
+      return '<li class="policy-card" data-policy="' + i + '"' + (p.renewsSoon ? ' data-renewing="1"' : '') + '>' +
+          '<button class="policy-summary" type="button" aria-expanded="false">' +
+            '<span class="policy-icon">' + esc(policyAbbrev(p.type)) + '</span>' +
+            '<span class="policy-info"><span class="n">' + esc(p.type) + '</span>' +
+              (meta ? '<span class="m">' + esc(meta) + '</span>' : '') + '</span>' +
+            '<span class="policy-tags">' + renewalChip(p) + statusBadge(p.status) + '</span>' +
+            '<span class="policy-caret">' + CARET_ICON + '</span>' +
+          '</button>' +
+          '<div class="policy-body" hidden>' + body + '</div>' +
+        '</li>';
+    }).join("");
+  }
+
+  // Expand/collapse a policy card (event-delegated so it survives re-renders).
+  function initPolicyCards() {
+    var list = $("policyList");
+    if (!list) return;
+    list.addEventListener("click", function (e) {
+      var btn = e.target && e.target.closest ? e.target.closest(".policy-summary") : null;
+      if (!btn) return;
+      var card = btn.closest(".policy-card");
+      var body = card.querySelector(".policy-body");
+      var open = card.classList.toggle("open");
+      btn.setAttribute("aria-expanded", open ? "true" : "false");
+      if (body) body.hidden = !open;
+    });
+  }
+
+  // Clicking the "Renewing soon" stat scrolls to the policy list and expands
+  // the policies that are actually renewing, with a brief highlight.
+  function revealRenewing() {
+    activateTab("overview");
+    var cards = document.querySelectorAll('.policy-card[data-renewing="1"]');
+    if (!cards.length) return;
+    cards.forEach(function (card) {
+      card.classList.add("open", "flash");
+      var btn = card.querySelector(".policy-summary");
+      var body = card.querySelector(".policy-body");
+      if (btn) btn.setAttribute("aria-expanded", "true");
+      if (body) body.hidden = false;
+      setTimeout(function () { card.classList.remove("flash"); }, 1700);
+    });
+    cards[0].scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
   function renderHolders() {
     var el = $("holderList");
     if (!el) return;
-    el.innerHTML = state.holders.length ? state.holders.map(function (h) {
+    el.innerHTML = state.holders.length ? state.holders.map(function (h, i) {
       var bits = [h.address, h.date].filter(Boolean);
-      var dl = h.status === "issued"
-        ? '<a class="doc-dl" href="' + esc(h.url || "#") + '"' + (h.url && h.url !== "#" ? ' download' : '') + '>Download</a>'
-        : '';
+      var actions = '<span class="contact-actions">';
+      // Re-issue prefills the add-holder form with this holder so the client
+      // can get a fresh dated certificate (e.g. at renewal) without retyping.
+      actions += '<a href="#" class="doc-dl" data-reissue="' + i + '">Re-issue</a>';
+      if (h.status === "issued" && h.url && h.url !== "#") {
+        actions += '<a class="doc-dl" href="' + esc(h.url) + '" download>Download</a>';
+      }
+      actions += '</span>';
       return '<li><span class="doc-ico">' + FILE_ICON + '</span>' +
         '<span class="doc-meta"><span class="n">' + esc(h.name) + '</span>' +
         '<span class="m">' + esc(bits.join(" · ")) + '</span></span>' +
-        statusBadge(h.status) + dl + '</li>';
+        statusBadge(h.status) + actions + '</li>';
     }).join("") : '<li class="doc-empty">No certificate holders yet.</li>';
   }
 
   function updateStats() {
-    $("statPolicies").textContent = state.policies.length;
+    // "Active policies" counts only policies that are actually active.
+    var activeCount = state.policies.filter(function (p) { return p.status === "active"; }).length;
+    $("statPolicies").textContent = activeCount;
     var thirdCard = $("statThird").parentNode;
+    thirdCard.removeAttribute("data-goto");
+    thirdCard.removeAttribute("data-renew-stat");
     if (state.commercial) {
       // Every holder issues instantly now — show the running certificate count.
       $("statThirdLbl").textContent = "Certificates issued";
       $("statThird").textContent = state.holders.length;
       thirdCard.setAttribute("data-goto", "certificates");
     } else {
-      // Personal clients care about upcoming renewals instead.
+      // Personal clients care about upcoming renewals instead. Clicking the
+      // card jumps to (and expands) the policies that are renewing.
       var soon = state.policies.filter(function (p) { return p.renewsSoon; }).length;
       $("statThirdLbl").textContent = "Renewing soon";
       $("statThird").textContent = soon;
-      thirdCard.removeAttribute("data-goto");
+      if (soon > 0) thirdCard.setAttribute("data-renew-stat", "1");
     }
   }
 
@@ -316,6 +461,26 @@
     el.innerHTML = rows.map(function (r) {
       return '<div class="acct-item"><div class="k">' + esc(r[0]) + '</div><div class="v">' + esc(r[1] || "—") + '</div></div>';
     }).join("");
+    renderAgent(a.agent);
+  }
+
+  // The assigned IPG agent card — only shown when Bindly returns an agent on
+  // the profile (name at minimum). Otherwise the card stays hidden.
+  function renderAgent(agent) {
+    var card = $("agentCard");
+    if (!card) return;
+    if (!agent || !agent.name) { card.hidden = true; card.innerHTML = ""; return; }
+    var initials = agent.name.trim().split(/\s+/).slice(0, 2).map(function (w) { return w[0]; }).join("").toUpperCase();
+    var links = [];
+    if (agent.phone) links.push('<a href="tel:' + esc(agent.phone.replace(/[^\d+]/g, "")) + '">' + esc(agent.phone) + '</a>');
+    if (agent.email) links.push('<a href="mailto:' + esc(agent.email) + '">' + esc(agent.email) + '</a>');
+    card.innerHTML =
+      '<span class="agent-avatar">' + esc(initials || "IPG") + '</span>' +
+      '<span class="agent-meta"><span class="role">Your IPG Agent</span>' +
+      '<span class="name">' + esc(agent.name) + '</span>' +
+      (links.length ? '<span class="agent-links">' + links.join("") + '</span>' : '') +
+      '</span>';
+    card.hidden = false;
   }
 
   function renderQuickActions() {
@@ -439,7 +604,7 @@
       // match-picker share the .doc-dl style — leave them to their own handlers.
       if (a.hasAttribute("data-edit") || a.hasAttribute("data-remove") || a.hasAttribute("data-retry") ||
           a.hasAttribute("data-resend") || a.hasAttribute("data-revoke") || a.hasAttribute("data-remove-user") ||
-          a.hasAttribute("data-users-retry") || a.hasAttribute("data-pick-match")) return;
+          a.hasAttribute("data-users-retry") || a.hasAttribute("data-pick-match") || a.hasAttribute("data-reissue")) return;
       e.preventDefault();
       showToast("Downloads will be available once your account is connected to live data.");
     });
@@ -466,25 +631,33 @@
     });
   }
 
+  // Best-effort split of a stored display address ("100 Main St, Suite 4,
+  // Dallas, TX 75201") back into the form fields for Re-issue. Anything we
+  // can't confidently parse is left for the client to confirm before issuing.
+  function parseHolderAddress(addr) {
+    var out = { address1: "", address2: "", city: "", state: "", zip: "" };
+    if (!addr) return out;
+    var m = /^(.*?),\s*([^,]+),\s*([A-Za-z]{2})\.?\s+(\d{5}(?:-\d{4})?)\s*$/.exec(addr.trim());
+    if (m) {
+      out.address1 = m[1].trim();
+      out.city = m[2].trim();
+      out.state = m[3].toUpperCase();
+      out.zip = m[4];
+    } else {
+      out.address1 = addr.trim(); // couldn't parse cleanly — client fills the rest
+    }
+    return out;
+  }
+
   // ---- Add a certificate holder (self-service) ----
   function initHolderForm() {
     var form = $("holderForm");
     if (!form) return;
-    form.addEventListener("submit", function (e) {
-      e.preventDefault();
-      var msg = $("holderMsg");
-      msg.className = "portal-msg";
-      if (!form.checkValidity()) { form.reportValidity(); return; }
-      var data = {
-        name: $("hName").value,
-        address1: $("hAddr1").value,
-        address2: $("hAddr2").value,
-        city: $("hCity").value,
-        state: $("hState").value,
-        zip: $("hZip").value
-      };
+    var msg = $("holderMsg");
+
+    function submit(data) {
       var btn = form.querySelector('button[type="submit"]');
-      if (btn) { btn.disabled = true; btn.textContent = "Adding…"; }
+      if (btn) { btn.disabled = true; btn.textContent = "Issuing…"; }
       PortalData.addHolder(data).then(function (res) {
         if (res && res.ok) {
           state.holders.unshift(res.holder);
@@ -493,8 +666,85 @@
           msg.className = "portal-msg ok";
           msg.textContent = "Certificate issued — download it from the list below.";
         }
+      }).catch(function (err) {
+        msg.className = "portal-msg err";
+        msg.textContent = (err && err.message) || "We couldn’t issue that certificate. Please try again.";
       }).finally(function () {
         if (btn) { btn.disabled = false; btn.textContent = "Add holder"; }
+      });
+    }
+
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      msg.className = "portal-msg";
+      msg.textContent = "";
+      if (!form.checkValidity()) { form.reportValidity(); return; }
+      var data = {
+        name: $("hName").value.trim(),
+        address1: $("hAddr1").value,
+        address2: $("hAddr2").value,
+        city: $("hCity").value,
+        state: $("hState").value,
+        zip: $("hZip").value
+      };
+      // Warn on a duplicate holder name so the client doesn't issue two certs
+      // for the same holder by accident (re-issue at renewal is a real case,
+      // so we confirm rather than block).
+      var dupe = state.holders.some(function (h) {
+        return (h.name || "").trim().toLowerCase() === data.name.toLowerCase();
+      });
+      if (dupe && !window.confirm('A certificate for “' + data.name + '” already exists. Issue another one?')) return;
+      submit(data);
+    });
+
+    // Re-issue: prefill the form from an existing holder and jump to it.
+    var list = $("holderList");
+    if (list) {
+      list.addEventListener("click", function (e) {
+        var a = e.target && e.target.closest ? e.target.closest("[data-reissue]") : null;
+        if (!a) return;
+        e.preventDefault();
+        var h = state.holders[Number(a.getAttribute("data-reissue"))];
+        if (!h) return;
+        var p = parseHolderAddress(h.address);
+        $("hName").value = h.name || "";
+        $("hAddr1").value = p.address1;
+        $("hAddr2").value = p.address2;
+        $("hCity").value = p.city;
+        $("hState").value = p.state;
+        $("hZip").value = p.zip;
+        msg.className = "portal-msg";
+        msg.textContent = "Review the details below, then Add holder to issue a fresh certificate.";
+        form.scrollIntoView({ behavior: "smooth", block: "center" });
+        $("hName").focus();
+      });
+    }
+  }
+
+  // ---- Service: request a change ----
+  function initServiceForm() {
+    var form = $("serviceForm");
+    if (!form) return;
+    var msg = $("svcMsg");
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      msg.className = "portal-msg";
+      msg.textContent = "";
+      if (!form.checkValidity()) { form.reportValidity(); return; }
+      var data = { topic: $("svcTopic").value, message: $("svcMessage").value.trim() };
+      var btn = form.querySelector('button[type="submit"]');
+      if (btn) { btn.disabled = true; btn.textContent = "Sending…"; }
+      PortalData.submitServiceRequest(data).then(function (res) {
+        if (res && res.ok) {
+          form.reset();
+          msg.className = "portal-msg ok";
+          msg.textContent = "Thanks — your request is in. Your IPG service team will follow up shortly.";
+        }
+      }).catch(function (err) {
+        msg.className = "portal-msg err";
+        msg.textContent = (err && err.message) || "We couldn’t send that just now. Please call (214) 377-1460.";
+      }).finally(function () {
+        if (btn) { btn.disabled = false; btn.textContent = "Send request"; }
       });
     });
   }
@@ -503,10 +753,12 @@
   // The mock resolves instantly, but real Bindly-backed calls won't — and one
   // failed request must never leave a client staring at silently-empty panels.
   function setDashboardLoading() {
-    ["policyList", "docList", "holderList", "contactList"].forEach(function (id) {
+    ["policyList", "holderList", "contactList"].forEach(function (id) {
       var el = $(id);
       if (el) el.innerHTML = '<li class="doc-empty">Loading…</li>';
     });
+    var groups = $("docGroups");
+    if (groups) groups.innerHTML = '<ul class="doc-list"><li class="doc-empty">Loading…</li></ul>';
     var grid = $("acctGrid");
     if (grid) grid.innerHTML = '<div class="doc-empty">Loading…</div>';
     $("statPolicies").textContent = "—";
@@ -515,10 +767,12 @@
   }
   function setDashboardError() {
     var retry = 'Couldn’t load this — <a href="#" class="doc-dl" data-retry>try again</a>.';
-    ["policyList", "docList", "holderList", "contactList"].forEach(function (id) {
+    ["policyList", "holderList", "contactList"].forEach(function (id) {
       var el = $(id);
       if (el) el.innerHTML = '<li class="doc-empty">' + retry + '</li>';
     });
+    var groups = $("docGroups");
+    if (groups) groups.innerHTML = '<ul class="doc-list"><li class="doc-empty">' + retry + '</li></ul>';
     var grid = $("acctGrid");
     if (grid) grid.innerHTML = '<div class="doc-empty">' + retry + '</div>';
   }
@@ -530,11 +784,13 @@
       PortalData.getContacts()
     ]).then(function (r) {
       state.policies = r[0] || [];
+      state.documents = r[1] || [];
       state.holders = r[2] || [];
       state.contacts = r[4] || [];
-      $("statDocs").textContent = (r[1] || []).length;
+      $("statDocs").textContent = state.documents.length;
       renderPolicies();
-      renderDocs($("docList"), r[1], "No documents on file yet.");
+      var search = $("docSearch"); if (search) search.value = "";
+      renderDocGroups("");
       renderHolders();
       renderAccount(r[3]);
       renderContacts();
@@ -548,6 +804,11 @@
     if (!a) return;
     e.preventDefault();
     loadDashboard();
+  });
+  // Clicking the "Renewing soon" stat card reveals the renewing policies.
+  document.addEventListener("click", function (e) {
+    var card = e.target && e.target.closest ? e.target.closest("[data-renew-stat]") : null;
+    if (card) revealRenewing();
   });
 
   // ---- Admin tab (staff/admin only) ----
@@ -848,7 +1109,7 @@
   // Show client tabs vs the admin-only tab. Staff see only Admin; clients never
   // see Admin. (The Certificates tab stays commercial-gated in showDashboard.)
   function setChrome(mode) {
-    var clientTabs = ["overview", "documents", "certificates", "account"];
+    var clientTabs = ["overview", "documents", "certificates", "service", "account"];
     var staffTabs = ["admin", "team"];
     document.querySelectorAll(".ptab").forEach(function (t) {
       var name = t.getAttribute("data-tab");
@@ -1206,7 +1467,10 @@
   }
 
   initTabs();
+  initPolicyCards();
+  initDocSearch();
   initHolderForm();
+  initServiceForm();
   initContactForm();
   initInviteForm();
   initTeamInviteForm();
@@ -1217,7 +1481,60 @@
   // Local-dev hook (localhost only) for exercising the invite-accept UI and
   // poking the live data layers from the console. Not defined on the live domain.
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) {
+    // Localhost-only visual harness: render the dashboard with representative
+    // data so the UI can be reviewed without a live Clerk login + Bindly
+    // backend. Inert on ipg.team (this whole block never runs off localhost).
+    function renderSample(type) {
+      var commercial = type !== "personal";
+      state.commercial = commercial;
+      state.policies = [
+        { type: "General Liability", number: "CBE00432048P-00", carrier: "QuoteWell (MGA)",
+          term: "May 2025 – May 2026", effective: "May 2025", expiration: "May 2026",
+          status: "active", renewsSoon: true, daysToRenew: 9,
+          coverages: [ { label: "Each Occurrence", value: "$1,000,000" }, { label: "General Aggregate", value: "$2,000,000" },
+            { label: "Products / Completed Ops", value: "$2,000,000" }, { label: "Damage to Rented Premises", value: "$100,000" },
+            { label: "Medical Expense", value: "$5,000" }, { label: "Deductible", value: "$2,500" } ] },
+        { type: "Workers Compensation", number: "TXM-99812", carrier: "Texas Mutual",
+          term: "Jan 2026 – Jan 2027", effective: "Jan 2026", expiration: "Jan 2027",
+          status: "active", renewsSoon: false, daysToRenew: 180,
+          coverages: [ { label: "E.L. Each Accident", value: "$1,000,000" }, { label: "E.L. Disease — Policy Limit", value: "$1,000,000" } ] },
+        { type: "Commercial Auto", number: "CA-55231", carrier: "Progressive",
+          term: "Mar 2024 – Mar 2025", effective: "Mar 2024", expiration: "Mar 2025",
+          status: "expired", renewsSoon: false, daysToRenew: -120, coverages: [] }
+      ];
+      state.documents = [
+        { name: "Acosta Drilling_GL Binder.pdf", kind: "Policies", date: "May 30, 2025", url: "#" },
+        { name: "Workers Comp Policy 2026.pdf", kind: "Policies", date: "Jan 2, 2026", url: "#" },
+        { name: "Auto ID Card.pdf", kind: "ID Cards", date: "Mar 3, 2024", url: "#" },
+        { name: "GL Dec Page.pdf", kind: "Declarations", date: "May 30, 2025", url: "#" },
+        { name: "2025 Loss Runs.pdf", kind: "Loss Runs", date: "Jun 1, 2026", url: "#" }
+      ];
+      state.holders = commercial ? [
+        { id: "c1", name: "City of Dallas", address: "1500 Marilla St, Dallas, TX 75201", status: "issued", date: "Jul 1, 2026", url: "#" }
+      ] : [];
+      state.contacts = [ { id: "p1", name: "Jane Doe", role: "Billing", email: "jane@example.com", phone: "214-555-0148" } ];
+      loginView.hidden = true; appView.hidden = false; siteHeader(false);
+      setChrome("client");
+      var certTab = $("certTab"); if (certTab) certTab.hidden = !commercial;
+      $("pUser").textContent = commercial ? "Acosta Drilling Inc" : "Jared Viracola";
+      $("pWelcome").textContent = "Welcome, " + (commercial ? "Acosta Drilling" : "Jared") + ".";
+      $("pCompany").textContent = commercial ? "Acosta Drilling Inc" : "";
+      renderQuickActions();
+      renderPolicies();
+      var search = $("docSearch"); if (search) search.value = "";
+      renderDocGroups("");
+      renderHolders();
+      renderAccount({ name: commercial ? "Acosta Drilling Inc" : "Jared Viracola",
+        company: commercial ? "Acosta Drilling Inc" : "", email: "client@example.com", phone: "214-555-0100",
+        address: "123 Main St, Dallas, TX 75201",
+        agent: { name: "Cole LeClair", phone: "214-377-1460", email: "cole@ipg.team" } });
+      renderContacts();
+      updateStats();
+      $("statDocs").textContent = state.documents.length;
+      activateTab("overview");
+    }
     window.__portalDebug = { data: PortalData, reload: loadDashboard, admin: AdminData,
+      renderSample: renderSample,
       showAccept: function () { showAcceptView(); var f = $("acEmail"); if (f) f.value = "teammate@ipg.team"; } };
   }
 })();
