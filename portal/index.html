@@ -13,24 +13,37 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap">
 <!-- Shares the main site's design so it stays in sync automatically -->
 <link rel="stylesheet" href="../assets/styles.css">
-<!-- Clerk auth (Phase 1). The publishable key is public and safe to expose.
-     This loads the PRODUCTION Clerk instance (clerk.ipg.team) so it must stay
-     in sync with PORTAL_CONFIG.clerkPublishableKey in portal.js — both must
-     point at the same instance or login will silently issue dev-instance
-     tokens the backend can't verify (see July 11 "unknown signing key" bug). -->
-<script
-  async crossorigin="anonymous"
-  data-clerk-publishable-key="pk_live_Y2xlcmsuaXBnLnRlYW0k"
-  src="https://clerk.ipg.team/npm/@clerk/clerk-js@5/dist/clerk.browser.js"
-  type="text/javascript"
-></script>
+<!-- Clerk auth (Phase 1). ONE place picks the instance: localhost loads the
+     Development instance (so login is testable locally — production Clerk
+     rejects localhost origins), everywhere else loads PRODUCTION
+     (clerk.ipg.team). portal.js reads window.PORTAL_CLERK.key, so a future
+     key change happens here ONLY — the July 11 "unknown signing key" bug was
+     this tag and portal.js falling out of sync. Publishable keys are public
+     and safe to expose. -->
+<script>
+  (function () {
+    var dev = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
+    window.PORTAL_CLERK = dev
+      ? { key: "pk_test_ZXhjaXRpbmctb3lzdGVyLTc1LmNsZXJrLmFjY291bnRzLmRldiQ",
+          host: "https://exciting-oyster-75.clerk.accounts.dev" }
+      : { key: "pk_live_Y2xlcmsuaXBnLnRlYW0k",
+          host: "https://clerk.ipg.team" };
+    var s = document.createElement("script");
+    s.async = true;
+    s.crossOrigin = "anonymous";
+    s.setAttribute("data-clerk-publishable-key", window.PORTAL_CLERK.key);
+    s.src = window.PORTAL_CLERK.host + "/npm/@clerk/clerk-js@5/dist/clerk.browser.js";
+    document.head.appendChild(s);
+  })();
+</script>
 <style>
   /* hidden must beat class display rules (.portal-auth is display:flex) */
   [hidden] { display: none !important; }
   :root { --flag-h: 30px; }
-  /* keep all content clear of the fixed preview flag */
-  body { padding-top: var(--flag-h); }
-  .portal-flag { position: fixed; top: 0; left: 0; right: 0; background: var(--honey, #C98A2B); color: #fff; text-align: center; font-size: 12.5px; font-weight: 600; padding: 6px 12px; z-index: 100; letter-spacing: .02em; }
+  /* The flag sits in normal page flow (not fixed), so however many lines it
+     wraps to on a narrow phone, it can never overlap the header below it —
+     the old fixed version assumed one line and covered the logo on mobile. */
+  .portal-flag { background: var(--honey, #C98A2B); color: #fff; text-align: center; font-size: 12.5px; font-weight: 600; padding: 6px 12px; letter-spacing: .02em; }
   /* ---- Login ---- */
   .portal-auth { min-height: calc(100vh - var(--flag-h)); display: flex; align-items: center; justify-content: center; padding: 48px 20px; }
   .portal-card { width: 100%; max-width: 420px; background: var(--white); border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow-card); padding: 40px 34px; text-align: center; }
@@ -64,7 +77,7 @@
     .portal-site-header .nav-links { display: none !important; }
   }
   /* ---- Chrome ---- */
-  .portal-header { position: sticky; top: var(--flag-h); z-index: 40; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 32px; background: rgba(244,246,250,0.92); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
+  .portal-header { position: sticky; top: 0; z-index: 40; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 32px; background: rgba(244,246,250,0.92); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
   .portal-header-left { display: flex; align-items: center; gap: 20px; }
   .portal-back { font-size: 13.5px; font-weight: 600; color: var(--ipg-blue); text-decoration: none; white-space: nowrap; }
   .portal-back:hover { text-decoration: underline; }
@@ -152,7 +165,9 @@
 </head>
 <body>
 
-<div class="portal-flag">IPG Client Portal — preview build (not yet connected to live accounts)</div>
+<!-- Early-access flag: real logins work, so this no longer claims the portal
+     is disconnected (clients DO see live data). Remove at broad launch. -->
+<div class="portal-flag">Welcome to the new IPG Client Portal — questions? Call (214) 377-1460</div>
 
 <!-- PUBLIC SITE HEADER — shown on the login / set-password screens so the portal
      reads as part of ipg.team, not a separate app. portal.js hides it once the
@@ -418,6 +433,6 @@
   </main>
 </div>
 
-<script src="portal.js?v=27"></script>
+<script src="portal.js?v=28"></script>
 </body>
 </html>

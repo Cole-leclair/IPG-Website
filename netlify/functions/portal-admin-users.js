@@ -209,13 +209,15 @@ exports.handler = async function (event) {
       // Permanently remove an ACTIVE login (a Clerk user). Irreversible.
       if (!body.id) return respond.json(400, { error: "id is required" });
       if (body.id === staff.authUserId) return respond.json(400, { error: "you can't remove your own login" });
-      // Non-admins may remove clients only, never staff/admins.
+      // Non-admins may remove clients only, never staff/admins. If the role
+      // lookup fails we REFUSE the delete (fail closed) — a transient Clerk
+      // error must never let staff delete a team member.
       if (staff.role !== "admin") {
-        try {
-          var t = await clerk.getUser(body.id);
-          var trole = (t && t.public_metadata && t.public_metadata.role) || "client";
-          if (isTeamRole(trole)) return respond.json(403, { error: "only admins can remove team members" });
-        } catch (ignore) { /* if lookup fails, fall through */ }
+        var t;
+        try { t = await clerk.getUser(body.id); }
+        catch (e3) { return respond.json(502, { error: "couldn't verify that login just now — try again" }); }
+        var trole = (t && t.public_metadata && t.public_metadata.role) || "client";
+        if (isTeamRole(trole)) return respond.json(403, { error: "only admins can remove team members" });
       }
       await clerk.deleteUser(body.id);
       audit.log({ action: "user_deleted", actor: staff.authUserId, target: body.id });

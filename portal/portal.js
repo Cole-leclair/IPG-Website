@@ -32,8 +32,11 @@
   // CONFIG — flip the portal from PREVIEW MODE to live auth.
   // =====================================================================
   var PORTAL_CONFIG = {
-    // Clerk publishable key (public — safe to expose in client code).
-    clerkPublishableKey: "pk_live_Y2xlcmsuaXBnLnRlYW0k",
+    // Clerk publishable key (public — safe to expose in client code). The key
+    // is chosen ONCE in index.html (window.PORTAL_CLERK): the Development
+    // instance on localhost, production (clerk.ipg.team) everywhere else —
+    // so this file and the script tag can never point at different instances.
+    clerkPublishableKey: (window.PORTAL_CLERK && window.PORTAL_CLERK.key) || "",
     // Base path for the portal API (Netlify functions). Used in Phase 2 when
     // the PortalData getters below start calling real endpoints.
     apiBase: "/.netlify/functions"
@@ -599,10 +602,11 @@
     document.addEventListener("click", function (e) {
       var a = e.target && e.target.closest ? e.target.closest("a.doc-dl") : null;
       if (!a || a.getAttribute("href") !== "#") return;
-      // Contact Edit/Remove and error-retry links share the .doc-dl style —
-      // leave them to their own handlers.
+      // Contact Edit/Remove, error-retry, admin actions, and the invite
+      // match-picker share the .doc-dl style — leave them to their own handlers.
       if (a.hasAttribute("data-edit") || a.hasAttribute("data-remove") || a.hasAttribute("data-retry") ||
-          a.hasAttribute("data-resend") || a.hasAttribute("data-revoke") || a.hasAttribute("data-remove-user") || a.hasAttribute("data-users-retry")) return;
+          a.hasAttribute("data-resend") || a.hasAttribute("data-revoke") || a.hasAttribute("data-remove-user") ||
+          a.hasAttribute("data-users-retry") || a.hasAttribute("data-pick-match")) return;
       e.preventDefault();
       showToast("Downloads will be available once your account is connected to live data.");
     });
@@ -923,7 +927,12 @@
     var removeId = a.getAttribute("data-remove-user");
     if (resendId) {
       var row = findRow(resendId);
-      if (row) AdminData.resend(row).then(function () { showToast("Invite re-sent to " + row.email + "."); });
+      // A resend actually revokes the old invite and creates a fresh one with a
+      // NEW id, so reload the list on success — otherwise the row on screen
+      // keeps the dead id and a later Revoke/Resend on it fails.
+      if (row) AdminData.resend(row)
+        .then(function () { showToast("Invite re-sent to " + row.email + "."); if (!adminPreview) loadUsers(); })
+        .catch(function (err) { showToast(err && err.message ? err.message : "Couldn’t re-send that invite — try again."); });
     } else if (revokeId) {
       var r2 = findRow(revokeId);
       if (!r2) return;
