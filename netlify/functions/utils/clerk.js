@@ -56,6 +56,28 @@ async function call(method, path, body) {
   return data;
 }
 
+// Clerk's list endpoints cap at 100 rows per page (regardless of the limit
+// requested) and return either a bare array or { data, total_count } — page
+// through with offset until a page comes back short, so the admin tab always
+// sees every client/invite instead of silently stopping at the first 100.
+// PAGE_CAP is just a runaway-loop backstop for a misbehaving response; real
+// client counts are nowhere near it today.
+var PAGE_CAP = 50; // 50 * 100 = 5,000 rows, far beyond any near-term client count
+
+async function listAll(path, query) {
+  var out = [];
+  var offset = 0;
+  for (var page = 0; page < PAGE_CAP; page++) {
+    var res = await call("GET", path + query + "&limit=100&offset=" + offset);
+    var items = Array.isArray(res) ? res : ((res && Array.isArray(res.data)) ? res.data : []);
+    out = out.concat(items);
+    if (items.length < 100) return out; // short page = last page
+    offset += 100;
+  }
+  console.log("CLERK_LIST_PAGE_CAP_HIT " + path + " — stopped after " + (PAGE_CAP * 100) + " rows");
+  return out;
+}
+
 module.exports = {
   configured: configured,
 
@@ -71,18 +93,19 @@ module.exports = {
   },
 
   // Pending invites = clients who've been emailed but haven't set up yet.
+  // Returns a plain array of every matching invitation (all pages).
   listInvitations: function (status) {
-    var q = "?limit=100&order_by=-created_at" + (status ? "&status=" + encodeURIComponent(status) : "");
-    return call("GET", "/invitations" + q);
+    var q = "?order_by=-created_at" + (status ? "&status=" + encodeURIComponent(status) : "");
+    return listAll("/invitations", q);
   },
 
   revokeInvitation: function (id) {
     return call("POST", "/invitations/" + encodeURIComponent(id) + "/revoke");
   },
 
-  // Accepted invites = active logins.
+  // Accepted invites = active logins. Returns a plain array of every user (all pages).
   listUsers: function () {
-    return call("GET", "/users?limit=100&order_by=-created_at");
+    return listAll("/users", "?order_by=-created_at");
   },
 
   getUser: function (id) {
