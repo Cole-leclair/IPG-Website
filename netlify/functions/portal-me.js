@@ -1,42 +1,30 @@
 // GET /portal/me — the signed-in client's profile + account type.
 // Maps to PortalData.getAccount() in portal.js (shape: { name, company,
-// email, phone, address, producer, csr }).
+// email, phone, address, producer, csrs }).
 var auth = require("./utils/auth");
 var bindly = require("./utils/bindly");
 var respond = require("./utils/respond");
 var ratelimit = require("./utils/ratelimit");
 var STAFF_DIRECTORY = require("./utils/staff-directory");
 
-// Pulls one assigned-person field (Producer or CSR) off the client record.
-// Bindly's exact field shape for these isn't documented yet, so this tries
-// several likely spellings — a nested object, or flat prefixed fields — and
-// returns null when no name is present at all, which is what tells the UI to
-// hide the card entirely (no card for a client with no producer/CSR set).
-function pickPerson(c, key) {
-  var candidates = [
-    c[key],
-    { name: c[key + "_name"], phone: c[key + "_phone"] || c[key + "_direct_line"] || c[key + "_direct"], email: c[key + "_email"] }
-  ];
-  var name = "", phone = "", email = "";
-  for (var i = 0; i < candidates.length; i++) {
-    var v = candidates[i];
-    if (!v) continue;
-    if (typeof v === "object") {
-      name = name || v.name || v.full_name || "";
-      phone = phone || v.phone || v.direct_line || v.direct || "";
-      email = email || v.email || "";
-    } else if (typeof v === "string" && v.trim()) {
-      name = name || v.trim();
-    }
-  }
-  if (!name) return null;
-  // Bindly's field may only carry a name — fill in phone/email from IPG's
-  // own staff directory when Bindly didn't send them.
-  if (!phone || !email) {
-    var staff = STAFF_DIRECTORY[name.trim().toLowerCase()];
-    if (staff) { phone = phone || staff.phone || ""; email = email || staff.email || ""; }
-  }
-  return { name: name, phone: phone || "", email: email || "" };
+// Bindly's confirmed shape (per their dev, 2026-07-12) on GET /clients/{id}:
+// `producer` and `csr` are each either an object { name, email } (name is
+// roster-resolved to Bindly's own display name; email can be "" if the
+// person isn't a Bindly login) or null (genuinely unassigned — hide the
+// card, don't show a blank one). `additional_csrs` is an array of the same
+// shape for clients with secondary CSRs, often empty.
+//
+// Bindly doesn't store staff phone numbers at all, so phone always comes
+// from IPG's own staff directory, keyed by the resolved name. The directory
+// is also the fallback for email if Bindly's copy is blank.
+function resolvePerson(p) {
+  if (!p || !p.name) return null;
+  var staff = STAFF_DIRECTORY[p.name.trim().toLowerCase()];
+  return {
+    name: p.name,
+    email: p.email || (staff && staff.email) || "",
+    phone: (staff && staff.phone) || ""
+  };
 }
 
 // Format Bindly's address (string OR { address1/line1, address2/line2, city,
@@ -78,8 +66,8 @@ exports.handler = async function (event) {
         email: c.email || "",
         phone: c.phone || "",
         address: addr,
-        producer: pickPerson(c, "producer"),
-        csr: pickPerson(c, "csr")
+        producer: resolvePerson(c.producer),
+        csrs: [c.csr].concat(c.additional_csrs || []).map(resolvePerson).filter(Boolean)
       }
     });
   } catch (e) {

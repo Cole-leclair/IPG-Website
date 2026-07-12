@@ -319,9 +319,10 @@
   }
 
   function statusBadge(status) {
-    // Policy statuses are derived from the expiration date (active/expired);
-    // issued certs are "issued". (The old "received"/"in review" states went
-    // away with the review-routed cert flow — every holder issues instantly.)
+    // Policy statuses come straight from Bindly's authoritative `status`
+    // field (active/expired/pending/unknown); issued certs are "issued".
+    // (The old "received"/"in review" cert states went away with the
+    // review-routed cert flow — every holder issues instantly.)
     var map = {
       active: ["active", "Active"], issued: ["issued", "Issued"],
       expired: ["expired", "Expired"], cancelled: ["expired", "Cancelled"], pending: ["pending", "Pending"]
@@ -495,26 +496,34 @@
       return '<div class="acct-item"><div class="k">' + esc(r[0]) + '</div><div class="v">' + esc(r[1] || "—") + '</div></div>';
     }).join("");
     renderPersonCard("producerCard", "Your Producer", a.producer);
-    renderPersonCard("csrCard", "Your CSR", a.csr);
+    // csrs is [primary CSR, ...additional_csrs] with nulls already filtered
+    // server-side — the primary CSR being unassigned doesn't hide a real
+    // secondary one, so this always reflects whoever's actually on file.
+    renderPersonCard("csrCard", "Your CSR", a.csrs);
   }
 
-  // Assigned-person card (Producer, CSR) — only shown when Bindly has that
-  // role set on the account (name at minimum). Otherwise the card stays
-  // hidden — a client with no producer/CSR on file gets no card at all.
-  function renderPersonCard(elId, roleLabel, person) {
-    var card = $(elId);
-    if (!card) return;
-    if (!person || !person.name) { card.hidden = true; card.innerHTML = ""; return; }
+  function personRow(person) {
     var initials = person.name.trim().split(/\s+/).slice(0, 2).map(function (w) { return w[0]; }).join("").toUpperCase();
     var links = [];
     if (person.phone) links.push('<a href="tel:' + esc(person.phone.replace(/[^\d+]/g, "")) + '">' + esc(person.phone) + '</a>');
     if (person.email) links.push('<a href="mailto:' + esc(person.email) + '">' + esc(person.email) + '</a>');
-    card.innerHTML =
+    return '<span class="agent-row">' +
       '<span class="agent-avatar">' + esc(initials || "IPG") + '</span>' +
-      '<span class="agent-meta"><span class="role">' + esc(roleLabel) + '</span>' +
-      '<span class="name">' + esc(person.name) + '</span>' +
+      '<span class="agent-meta"><span class="name">' + esc(person.name) + '</span>' +
       (links.length ? '<span class="agent-links">' + links.join("") + '</span>' : '') +
-      '</span>';
+      '</span></span>';
+  }
+
+  // Assigned-person card (Producer, CSR) — only shown when Bindly has that
+  // role set on the account. Accepts one person or an array (a CSR card can
+  // carry a primary plus any additional_csrs as extra rows). No one assigned
+  // means no card at all, not an empty one.
+  function renderPersonCard(elId, roleLabel, people) {
+    var card = $(elId);
+    if (!card) return;
+    var list = (Array.isArray(people) ? people : [people]).filter(function (p) { return p && p.name; });
+    if (!list.length) { card.hidden = true; card.innerHTML = ""; return; }
+    card.innerHTML = '<span class="role">' + esc(roleLabel) + '</span>' + list.map(personRow).join("");
     card.hidden = false;
   }
 
@@ -1570,8 +1579,11 @@
       renderAccount({ name: commercial ? "Acosta Drilling Inc" : "Jared Viracola",
         company: commercial ? "Acosta Drilling Inc" : "", email: "client@example.com", phone: "214-555-0100",
         address: "123 Main St, Dallas, TX 75201",
-        producer: { name: "Cole LeClair", phone: "214-377-1460", email: "cole@ipg.team" },
-        csr: { name: "Jane Smith", phone: "214-377-1461", email: "jane@ipg.team" } });
+        producer: { name: "Cole LeClair", phone: "214-404-9776", email: "cole@ipg.team" },
+        csrs: [
+          { name: "Julie Nguyen", phone: "469-679-1951", email: "julie@ipg.team" },
+          { name: "Ashton Warman", phone: "214-308-0985", email: "ashton@ipg.team" }
+        ] });
       renderContacts();
       updateStats();
       $("statDocs").textContent = state.documents.length;

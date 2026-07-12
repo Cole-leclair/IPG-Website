@@ -173,11 +173,15 @@
   .cert-explainer h3 { margin: 0 0 6px; font-size: 15px; color: var(--ink); }
   .cert-explainer p { margin: 0; font-size: 13.5px; line-height: 1.55; color: var(--slate); }
   /* ---- Account: assigned agent ---- */
-  .agent-card { display: flex; align-items: center; gap: 16px; background: linear-gradient(135deg, #f0f5fc, #ffffff); border: 1px solid #d9e4f4; border-radius: 16px; padding: 20px 24px; margin-bottom: 22px; box-shadow: var(--shadow-card); }
+  /* .agent-card can hold one row (Producer) or several (CSR + any additional
+     CSRs) — the role label heads the card once, each person is its own row. */
+  .agent-card { display: flex; flex-direction: column; gap: 16px; background: linear-gradient(135deg, #f0f5fc, #ffffff); border: 1px solid #d9e4f4; border-radius: 16px; padding: 20px 24px; margin-bottom: 22px; box-shadow: var(--shadow-card); }
+  .agent-card > .role { font-size: 11.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--slate); font-weight: 600; }
+  .agent-row { display: flex; align-items: center; gap: 16px; }
+  .agent-row + .agent-row { padding-top: 14px; border-top: 1px solid #d9e4f4; }
   .agent-avatar { flex-shrink: 0; width: 52px; height: 52px; border-radius: 50%; background: var(--ipg-blue); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 19px; font-weight: 700; }
   .agent-meta { min-width: 0; display: flex; flex-direction: column; }
-  .agent-meta .role { display: block; font-size: 11.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--slate); font-weight: 600; }
-  .agent-meta .name { display: block; font-size: 17px; font-weight: 700; color: var(--ink); margin: 2px 0 6px; }
+  .agent-meta .name { display: block; font-size: 17px; font-weight: 700; color: var(--ink); margin: 0 0 6px; }
   .agent-links { display: flex; gap: 8px 18px; flex-wrap: wrap; }
   .agent-links a { font-size: 13.5px; font-weight: 600; color: var(--ipg-blue); text-decoration: none; }
   .agent-links a:hover { text-decoration: underline; }
@@ -224,7 +228,7 @@
     .policy-summary { flex-wrap: wrap; }
     .policy-info { flex-basis: calc(100% - 56px); }
     .policy-tags { width: 100%; justify-content: flex-start; padding-left: 56px; }
-    .agent-card { flex-direction: column; align-items: flex-start; }
+    .agent-row { flex-direction: column; align-items: flex-start; }
   }
 </style>
 </head>
@@ -562,6 +566,6 @@
   </main>
 </div>
 
-<script src="portal.js?v=34"></script>
+<script src="portal.js?v=35"></script>
 </body>
 </html>
