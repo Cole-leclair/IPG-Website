@@ -141,7 +141,7 @@
   };
 
   // Local view state. Holders added in-session live here.
-  var state = { policies: [], holders: [], commercial: false, contacts: [], documents: [] };
+  var state = { policies: [], holders: [], commercial: false, contacts: [], documents: [], clerkName: "" };
 
   // =====================================================================
   // ADMIN DATA LAYER — the staff/admin tab (create + manage client logins).
@@ -450,6 +450,20 @@
       $("statThird").textContent = soon;
       if (soon > 0) thirdCard.setAttribute("data-renew-stat", "1");
     }
+  }
+
+  // Corrects the header/greeting once the real Bindly profile loads —
+  // showDashboard's initial paint only has the Clerk login name/email to go
+  // on. Personal: use the client's real name. Commercial: the small header
+  // name is the business name, but the big "Welcome" greeting stays the
+  // actual logged-in person's name (Bindly's name field is the business
+  // contact, which may not be who's signed in).
+  function updateHeaderName(account) {
+    if (!account) return;
+    var personal = account.name || state.clerkName;
+    var pUser = $("pUser"), pWelcome = $("pWelcome");
+    if (pUser) pUser.textContent = state.commercial ? (account.company || personal) : personal;
+    if (pWelcome) pWelcome.textContent = "Welcome, " + (state.commercial ? state.clerkName : personal) + ".";
   }
 
   function renderAccount(a) {
@@ -795,6 +809,7 @@
       renderAccount(r[3]);
       renderContacts();
       updateStats();
+      updateHeaderName(r[3]);
     }).catch(function () {
       setDashboardError();
     });
@@ -1369,6 +1384,11 @@
       if (role !== "client") { showAdmin({ name: name, role: role, id: Clerk.user.id }); return; }
       var type = md.account_type === "commercial" ? "commercial" : "personal";
       PortalData._type = type;
+      // The logged-in person's own Clerk name/email — used as the greeting
+      // for commercial accounts (whose Bindly "name" is the business contact,
+      // not necessarily the person signed in) and as a fallback until the
+      // real Bindly profile loads.
+      state.clerkName = name;
       showDashboard({ name: name, company: md.company || "", type: type });
     } else {
       // Signed out — show the native login form (reset any code step).

@@ -55,18 +55,27 @@ function humanizeKey(k) {
   return String(k).replace(/[_-]+/g, " ").replace(/\b\w/g, function (c) { return c.toUpperCase(); });
 }
 // Prefix "$" only for plain money-looking values (digits + commas), so we
-// don't mangle things like "Included", "Yes", or a percentage.
+// don't mangle things like "Included", "Yes", or a percentage. Plain
+// free-text values are capitalized ("active" -> "Active") since Bindly's
+// details object isn't guaranteed to send display-cased text.
 function fmtValue(v) {
   var s = String(v == null ? "" : v).trim();
   if (s === "") return "";
   if (/^\$/.test(s)) return s;
   if (/^[\d,]+(\.\d+)?$/.test(s)) return "$" + s;
-  return s;
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 function coverages(details) {
   if (!details || typeof details !== "object") return [];
   return Object.keys(details).reduce(function (acc, k) {
-    var val = fmtValue(details[k]);
+    var raw = details[k];
+    // Skip ACORD-style boolean endorsement flags (Additional Insured, Claims
+    // Made, Primary & Noncontributory, Subrogation Waived, and similar
+    // yes/no attributes) — these aren't coverage limits/deductibles, and
+    // showing a shortened field name next to "true"/"false" isn't
+    // client-friendly. Coverage details are for limits and dollar amounts.
+    if (typeof raw === "boolean" || /^(true|false)$/i.test(String(raw).trim())) return acc;
+    var val = fmtValue(raw);
     if (val !== "") acc.push({ label: humanizeKey(k), value: val });
     return acc;
   }, []);
