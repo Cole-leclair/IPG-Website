@@ -139,6 +139,7 @@
     border: 1px solid var(--line);
     border-radius: 8px;
     color: var(--ipg-blue) !important;
+    text-decoration: none;
   }
   .nav-login::after { display: none; }
   .nav-login:hover { border-color: var(--ipg-blue); background: var(--paper); }
