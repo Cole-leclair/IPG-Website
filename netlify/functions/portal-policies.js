@@ -111,10 +111,11 @@ exports.handler = async function (event) {
       var msLeft = exp ? (exp.getTime() - now.getTime()) : null;
       var renewsSoon = msLeft != null ? (msLeft <= soonMs && msLeft >= 0) : false;
       var daysToRenew = msLeft != null ? Math.ceil(msLeft / (24 * 60 * 60 * 1000)) : null;
-      // Bindly hasn't yet exposed an authoritative policy-status field (open
-      // question to their dev), so derive it from the expiration date: past
-      // expiration => expired, otherwise active. Prefer Bindly's own status if
-      // it ever starts sending one.
+      // Bindly now sends an authoritative `status` (2026-07-12): active,
+      // expired, pending (bound but not yet effective), or unknown (no
+      // parseable dates on their record) — computed with the same rule their
+      // own dashboard uses, so trust it outright. The expiration-date
+      // derivation below is only a fallback for a response that omits it.
       var status = (p.status || "").toLowerCase();
       if (!status) status = (msLeft != null && msLeft < 0) ? "expired" : "active";
       return {
