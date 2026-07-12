@@ -58,7 +58,10 @@ function inviteToRow(inv) {
 function userToRow(u) {
   var md = u.public_metadata || {};
   var email = (u.email_addresses && u.email_addresses[0] && u.email_addresses[0].email_address) || "";
-  var name = [u.first_name, u.last_name].filter(Boolean).join(" ");
+  // Prefer the client's Clerk first/last name; fall back to the Bindly-detected
+  // name we stored in metadata at invite time, so accounts where the client only
+  // set a password (no name typed) still show a real name instead of their email.
+  var name = [u.first_name, u.last_name].filter(Boolean).join(" ") || md.name || "";
   return {
     id: u.id,
     email: email,

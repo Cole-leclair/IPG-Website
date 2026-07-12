@@ -729,7 +729,7 @@
   function rowHtml(u, isTeam) {
     var bits = isTeam
       ? [ u.name ? u.email : "", cap(u.role), fmtDate(u.created) ].filter(Boolean)
-      : [ u.name ? u.email : "", cap(u.account_type), u.bindly_client_id ? "Bindly " + u.bindly_client_id : "", fmtDate(u.created) ].filter(Boolean);
+      : [ u.name ? u.email : "", cap(u.account_type), fmtDate(u.created) ].filter(Boolean);
     var actions;
     if (u.status === "invited") {
       actions = '<span class="contact-actions">' +
