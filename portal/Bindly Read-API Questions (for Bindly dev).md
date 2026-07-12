@@ -43,3 +43,28 @@ of the build; **8 and 10 are the two we most need**.
     these in our own DB.)
 
 Thanks — happy to hop on a call if that's faster than writing it all out.
+
+---
+
+## Follow-up (2026-07-11) — two data-consistency issues found while wiring up the real invite flow
+
+Thanks again for shipping the read API — it's live and working. Two things we ran into
+while testing real client invites that look like bugs on Bindly's side rather than ours:
+
+11. **`type` field disagrees with the dashboard.** `GET /clients/{client_id}` returned
+    `"type":"personal"` for a client whose Bindly dashboard clearly shows a **"Commercial"**
+    tag next to their name (test client "Bobby Jones", `client_id`
+    `a395bdd8-f43a-4cd9-9cf0-e3d3821345af`). Also, `GET /clients?q=` (the search/lookup
+    endpoint) returns `type` as an **empty string** in your own example in the API doc you
+    sent us — so we now only trust `type` from the full profile endpoint, but even that
+    disagreed with the UI for this client. Is `type` on the read API actually meant to
+    reflect personal vs. commercial, or is that classification tracked somewhere else on
+    your end? We need a reliable source for this field since it decides which dashboard a
+    client sees (e.g. commercial clients get a Certificates tab).
+12. **New clients take ~10 minutes to show up in search.** After creating a brand-new
+    client in Bindly, `GET /clients?q=<email>` doesn't find them for roughly 10 minutes,
+    even though the client already exists and is visible in your dashboard immediately. Is
+    the search/lookup endpoint backed by an index that updates on a delay? If so, roughly
+    how long should we expect staff to wait after adding a client before they can invite
+    them through our portal, and is there a faster path (e.g. querying by exact `client_id`
+    instead of search) that doesn't hit that delay?

@@ -102,6 +102,13 @@ function cleanInvite(input) {
 // rather than trusting whatever the browser sent — the browser only ever
 // gets to SELECT which lookup match it means, never invent the client id
 // or its type. Returns { type, bindlyName } or { error }.
+//
+// IMPORTANT: Bindly's search endpoint (GET /clients?q=) does NOT reliably
+// return `type` — their own API docs show it empty in the example response
+// ("Bindly_Portal_API_v1.md"). Only the full profile (GET /clients/{id}, i.e.
+// bindly.getClient) has an authoritative `type`. lookupClient() is still used
+// here to confirm clientId is actually a match for this EMAIL (so the browser
+// can't invent an unrelated client id); getClient() is what we trust for type.
 async function verifyBindlyClient(email, clientId) {
   if (!bindly.configured()) return { error: "Bindly portal API isn't configured yet" };
   var found;
@@ -110,7 +117,13 @@ async function verifyBindlyClient(email, clientId) {
   var list = (found && found.clients) || [];
   var match = list.filter(function (c) { return String(c.client_id) === clientId; })[0];
   if (!match) return { error: "that client no longer matches a Bindly record for this email — look it up again" };
-  return { type: match.type === "commercial" ? "commercial" : "personal", bindlyName: match.name || "" };
+  var profile;
+  try { profile = await bindly.getClient(clientId); }
+  catch (e2) { return { error: "couldn't verify this client's account type with Bindly: " + e2.message }; }
+  return {
+    type: (profile && profile.type === "commercial") ? "commercial" : "personal",
+    bindlyName: (profile && profile.name) || match.name || ""
+  };
 }
 
 function metaFor(v) {
