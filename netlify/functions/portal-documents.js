@@ -47,7 +47,7 @@ exports.handler = async function (event) {
         url: d.url || ""
       };
     });
-    audit.log({ action: "documents_listed", actor: ctx.authUserId, bindlyClientId: ctx.bindlyClientId, target: String(documents.length) });
+    await audit.log({ action: "documents_listed", actor: ctx.authUserId, bindlyClientId: ctx.bindlyClientId, target: String(documents.length), event: event });
     return respond.json(200, { documents: documents });
   } catch (e) {
     return respond.json(e.status || 500, { error: e.message });

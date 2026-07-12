@@ -105,7 +105,7 @@ exports.handler = async function (event) {
       throw err;
     }
 
-    audit.log({ action: "cert_issued", actor: ctx.authUserId, bindlyClientId: ctx.bindlyClientId, target: fields.holder_name });
+    await audit.log({ action: "cert_issued", actor: ctx.authUserId, bindlyClientId: ctx.bindlyClientId, target: fields.holder_name, event: event });
     return respond.json(201, { ok: true, status: "issued", holder: {
       id: (issued && issued.filename) || fields.holder_name,
       name: fields.holder_name,

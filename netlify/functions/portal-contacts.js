@@ -83,7 +83,7 @@ exports.handler = async function (event) {
       if (checked.error) return respond.json(400, { error: checked.error });
       var addResp = await bindly.addContact(ctx.bindlyClientId, checked.contact);
       var created = unwrap(addResp, checked.contact);
-      audit.log({ action: "contact_added", actor: ctx.authUserId, bindlyClientId: ctx.bindlyClientId, target: created.id });
+      await audit.log({ action: "contact_added", actor: ctx.authUserId, bindlyClientId: ctx.bindlyClientId, target: created.id, event: event });
       return respond.json(201, { ok: true, contact: created });
     }
 
@@ -97,14 +97,14 @@ exports.handler = async function (event) {
       var updResp = await bindly.updateContact(ctx.bindlyClientId, id, checkedPut.contact);
       var updated = unwrap(updResp, checkedPut.contact);
       updated.id = id;
-      audit.log({ action: "contact_updated", actor: ctx.authUserId, bindlyClientId: ctx.bindlyClientId, target: id });
+      await audit.log({ action: "contact_updated", actor: ctx.authUserId, bindlyClientId: ctx.bindlyClientId, target: id, event: event });
       return respond.json(200, { ok: true, contact: updated });
     }
 
     // DELETE
     if (!id) return respond.json(400, { error: "id query param is required" });
     await bindly.removeContact(ctx.bindlyClientId, id);
-    audit.log({ action: "contact_removed", actor: ctx.authUserId, bindlyClientId: ctx.bindlyClientId, target: id });
+    await audit.log({ action: "contact_removed", actor: ctx.authUserId, bindlyClientId: ctx.bindlyClientId, target: id, event: event });
     return respond.json(200, { ok: true });
   } catch (e) {
     return respond.json(e.status || 500, { error: e.message });

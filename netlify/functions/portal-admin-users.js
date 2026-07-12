@@ -211,7 +211,7 @@ exports.handler = async function (event) {
     if (action === "revoke") {
       if (!body.id) return respond.json(400, { error: "id is required" });
       await clerk.revokeInvitation(body.id);
-      audit.log({ action: "invite_revoked", actor: staff.authUserId, target: body.id });
+      await audit.log({ action: "invite_revoked", actor: staff.authUserId, target: body.id, event: event });
       return respond.json(200, { ok: true });
     }
 
@@ -230,7 +230,7 @@ exports.handler = async function (event) {
         if (isTeamRole(trole)) return respond.json(403, { error: "only admins can remove team members" });
       }
       await clerk.deleteUser(body.id);
-      audit.log({ action: "user_deleted", actor: staff.authUserId, target: body.id });
+      await audit.log({ action: "user_deleted", actor: staff.authUserId, target: body.id, event: event });
       return respond.json(200, { ok: true });
     }
 
@@ -242,7 +242,7 @@ exports.handler = async function (event) {
         if (!EMAIL_RE.test(teEmail)) return respond.json(400, { error: "a valid email is required" });
         if (body.id) { try { await clerk.revokeInvitation(body.id); } catch (ignore1) { /* already gone */ } }
         var reTeam = await clerk.createInvitation(teEmail, teamMeta(reqRole, body.name), redirectUrl);
-        audit.log({ action: "team_invite_resent", actor: staff.authUserId, target: reTeam && reTeam.id });
+        await audit.log({ action: "team_invite_resent", actor: staff.authUserId, target: reTeam && reTeam.id, event: event });
         return respond.json(200, { ok: true, user: inviteToRow(reTeam) });
       }
       var checkedR = cleanInvite(body);
@@ -253,7 +253,7 @@ exports.handler = async function (event) {
       if (!checkedR.data.name) checkedR.data.name = verifiedR.bindlyName;
       if (body.id) { try { await clerk.revokeInvitation(body.id); } catch (ignore) { /* already gone */ } }
       var reInv = await clerk.createInvitation(checkedR.data.email, metaFor(checkedR.data), redirectUrl);
-      audit.log({ action: "invite_resent", actor: staff.authUserId, target: reInv && reInv.id, bindlyClientId: checkedR.data.client });
+      await audit.log({ action: "invite_resent", actor: staff.authUserId, target: reInv && reInv.id, bindlyClientId: checkedR.data.client, event: event });
       return respond.json(200, { ok: true, user: inviteToRow(reInv) });
     }
 
@@ -262,7 +262,7 @@ exports.handler = async function (event) {
       var tmEmail = String(body.email || "").trim();
       if (!EMAIL_RE.test(tmEmail)) return respond.json(400, { error: "a valid email is required" });
       var tmInv = await clerk.createInvitation(tmEmail, teamMeta(reqRole, body.name), redirectUrl);
-      audit.log({ action: "team_invited", actor: staff.authUserId, target: tmInv && tmInv.id });
+      await audit.log({ action: "team_invited", actor: staff.authUserId, target: tmInv && tmInv.id, event: event });
       return respond.json(201, { ok: true, user: inviteToRow(tmInv) });
     }
     var checked = cleanInvite(body);
@@ -272,7 +272,7 @@ exports.handler = async function (event) {
     checked.data.type = checked.data.accountType || verified.type;
     if (!checked.data.name) checked.data.name = verified.bindlyName;
     var inv = await clerk.createInvitation(checked.data.email, metaFor(checked.data), redirectUrl);
-    audit.log({ action: "invite_created", actor: staff.authUserId, target: inv && inv.id, bindlyClientId: checked.data.client });
+    await audit.log({ action: "invite_created", actor: staff.authUserId, target: inv && inv.id, bindlyClientId: checked.data.client, event: event });
     return respond.json(201, { ok: true, user: inviteToRow(inv) });
   } catch (e) {
     return respond.json(e.status || 500, { error: e.message });
