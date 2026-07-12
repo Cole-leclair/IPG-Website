@@ -1,29 +1,42 @@
 // GET /portal/me — the signed-in client's profile + account type.
 // Maps to PortalData.getAccount() in portal.js (shape: { name, company,
-// email, phone, address, agent }).
+// email, phone, address, producer, csr }).
 var auth = require("./utils/auth");
 var bindly = require("./utils/bindly");
 var respond = require("./utils/respond");
 var ratelimit = require("./utils/ratelimit");
+var STAFF_DIRECTORY = require("./utils/staff-directory");
 
-// Pull the assigned agent / producer off the profile IF Bindly sends one.
-// Bindly's documented profile fields don't yet include a producer (open
-// question to their dev), so this reads several likely shapes and simply
-// returns null when nothing is present — the UI hides the block in that case.
-function pickAgent(c) {
-  var a = c.agent || c.producer || c.account_manager || c.csr || null;
-  var name, phone, email;
-  if (a && typeof a === "object") {
-    name = a.name || a.full_name || "";
-    phone = a.phone || a.direct_line || a.direct || "";
-    email = a.email || "";
-  } else {
-    name = c.agent_name || c.producer_name || (typeof a === "string" ? a : "");
-    phone = c.agent_phone || c.producer_phone || c.agent_direct_line || "";
-    email = c.agent_email || c.producer_email || "";
+// Pulls one assigned-person field (Producer or CSR) off the client record.
+// Bindly's exact field shape for these isn't documented yet, so this tries
+// several likely spellings — a nested object, or flat prefixed fields — and
+// returns null when no name is present at all, which is what tells the UI to
+// hide the card entirely (no card for a client with no producer/CSR set).
+function pickPerson(c, key) {
+  var candidates = [
+    c[key],
+    { name: c[key + "_name"], phone: c[key + "_phone"] || c[key + "_direct_line"] || c[key + "_direct"], email: c[key + "_email"] }
+  ];
+  var name = "", phone = "", email = "";
+  for (var i = 0; i < candidates.length; i++) {
+    var v = candidates[i];
+    if (!v) continue;
+    if (typeof v === "object") {
+      name = name || v.name || v.full_name || "";
+      phone = phone || v.phone || v.direct_line || v.direct || "";
+      email = email || v.email || "";
+    } else if (typeof v === "string" && v.trim()) {
+      name = name || v.trim();
+    }
   }
-  if (!name && !phone && !email) return null;
-  return { name: name || "", phone: phone || "", email: email || "" };
+  if (!name) return null;
+  // Bindly's field may only carry a name — fill in phone/email from IPG's
+  // own staff directory when Bindly didn't send them.
+  if (!phone || !email) {
+    var staff = STAFF_DIRECTORY[name.trim().toLowerCase()];
+    if (staff) { phone = phone || staff.phone || ""; email = email || staff.email || ""; }
+  }
+  return { name: name, phone: phone || "", email: email || "" };
 }
 
 // Format Bindly's address (string OR { address1/line1, address2/line2, city,
@@ -65,7 +78,8 @@ exports.handler = async function (event) {
         email: c.email || "",
         phone: c.phone || "",
         address: addr,
-        agent: pickAgent(c)
+        producer: pickPerson(c, "producer"),
+        csr: pickPerson(c, "csr")
       }
     });
   } catch (e) {

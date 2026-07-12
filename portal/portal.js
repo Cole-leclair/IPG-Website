@@ -475,23 +475,25 @@
     el.innerHTML = rows.map(function (r) {
       return '<div class="acct-item"><div class="k">' + esc(r[0]) + '</div><div class="v">' + esc(r[1] || "—") + '</div></div>';
     }).join("");
-    renderAgent(a.agent);
+    renderPersonCard("producerCard", "Your Producer", a.producer);
+    renderPersonCard("csrCard", "Your CSR", a.csr);
   }
 
-  // The assigned IPG agent card — only shown when Bindly returns an agent on
-  // the profile (name at minimum). Otherwise the card stays hidden.
-  function renderAgent(agent) {
-    var card = $("agentCard");
+  // Assigned-person card (Producer, CSR) — only shown when Bindly has that
+  // role set on the account (name at minimum). Otherwise the card stays
+  // hidden — a client with no producer/CSR on file gets no card at all.
+  function renderPersonCard(elId, roleLabel, person) {
+    var card = $(elId);
     if (!card) return;
-    if (!agent || !agent.name) { card.hidden = true; card.innerHTML = ""; return; }
-    var initials = agent.name.trim().split(/\s+/).slice(0, 2).map(function (w) { return w[0]; }).join("").toUpperCase();
+    if (!person || !person.name) { card.hidden = true; card.innerHTML = ""; return; }
+    var initials = person.name.trim().split(/\s+/).slice(0, 2).map(function (w) { return w[0]; }).join("").toUpperCase();
     var links = [];
-    if (agent.phone) links.push('<a href="tel:' + esc(agent.phone.replace(/[^\d+]/g, "")) + '">' + esc(agent.phone) + '</a>');
-    if (agent.email) links.push('<a href="mailto:' + esc(agent.email) + '">' + esc(agent.email) + '</a>');
+    if (person.phone) links.push('<a href="tel:' + esc(person.phone.replace(/[^\d+]/g, "")) + '">' + esc(person.phone) + '</a>');
+    if (person.email) links.push('<a href="mailto:' + esc(person.email) + '">' + esc(person.email) + '</a>');
     card.innerHTML =
       '<span class="agent-avatar">' + esc(initials || "IPG") + '</span>' +
-      '<span class="agent-meta"><span class="role">Your IPG Agent</span>' +
-      '<span class="name">' + esc(agent.name) + '</span>' +
+      '<span class="agent-meta"><span class="role">' + esc(roleLabel) + '</span>' +
+      '<span class="name">' + esc(person.name) + '</span>' +
       (links.length ? '<span class="agent-links">' + links.join("") + '</span>' : '') +
       '</span>';
     card.hidden = false;
@@ -1547,7 +1549,8 @@
       renderAccount({ name: commercial ? "Acosta Drilling Inc" : "Jared Viracola",
         company: commercial ? "Acosta Drilling Inc" : "", email: "client@example.com", phone: "214-555-0100",
         address: "123 Main St, Dallas, TX 75201",
-        agent: { name: "Cole LeClair", phone: "214-377-1460", email: "cole@ipg.team" } });
+        producer: { name: "Cole LeClair", phone: "214-377-1460", email: "cole@ipg.team" },
+        csr: { name: "Jane Smith", phone: "214-377-1461", email: "jane@ipg.team" } });
       renderContacts();
       updateStats();
       $("statDocs").textContent = state.documents.length;
