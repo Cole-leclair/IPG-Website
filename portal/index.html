@@ -53,8 +53,6 @@
   .portal-card form { text-align: left; }
   .portal-card .form-field { margin-bottom: 16px; }
   .portal-card .btn-primary { width: 100%; justify-content: center; margin-top: 4px; }
-  #previewEntry .btn { width: 100%; justify-content: center; }
-  #previewEntry .btn + .btn { margin-top: 10px; }
   .portal-help { font-size: 13px; color: var(--slate); margin: 22px 0 0; line-height: 1.6; }
   .portal-msg { font-size: 13px; margin: 12px 0 0; min-height: 1em; }
   .portal-msg.err { color: #b23b3b; }
@@ -197,15 +195,6 @@
     <img class="logo-img" src="../assets/logo.png" alt="Insurance Partner Group">
     <h1 id="loginTitle">Client Login</h1>
     <p class="portal-sub" id="loginSub">Access your policies, documents, and certificates of insurance.</p>
-    <!-- PREVIEW MODE ONLY: portal.js hides the login form and shows these demo
-         buttons instead, so nobody types real credentials into a mock form.
-         Once Clerk is live (PORTAL_CONFIG.clerkPublishableKey set) the real
-         form below is shown and this block stays hidden. -->
-    <div id="previewEntry" hidden>
-      <button id="demoPersonal" class="btn btn-primary" type="button">View demo — Personal client</button>
-      <button id="demoCommercial" class="btn btn-outline" type="button">View demo — Business client</button>
-      <button id="demoAdmin" class="btn btn-outline" type="button">View demo — IPG Admin</button>
-    </div>
     <form id="loginForm" novalidate>
       <div class="form-field"><label for="plEmail">Email</label><input id="plEmail" type="email" autocomplete="email" required></div>
       <div class="form-field"><label for="plPass">Password</label><input id="plPass" type="password" autocomplete="current-password" required></div>
@@ -433,6 +422,6 @@
   </main>
 </div>
 
-<script src="portal.js?v=28"></script>
+<script src="portal.js?v=29"></script>
 </body>
 </html>

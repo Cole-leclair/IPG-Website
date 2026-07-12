@@ -29,7 +29,7 @@
   "use strict";
 
   // =====================================================================
-  // CONFIG — flip the portal from PREVIEW MODE to live auth.
+  // CONFIG — Clerk auth wiring for the portal.
   // =====================================================================
   var PORTAL_CONFIG = {
     // Clerk publishable key (public — safe to expose in client code). The key
@@ -43,22 +43,14 @@
   };
 
   // A pk_test_ key is a Clerk DEVELOPMENT instance — valid only on localhost.
-  // So real login turns on locally for testing, while the deployed portal at
-  // ipg.team stays in PREVIEW MODE (demo buttons + mock data) until a
-  // production key (pk_live_) is set — which then activates login everywhere.
+  // So real login runs locally against the dev instance for testing, and on
+  // ipg.team against the production (pk_live_) instance. If no key is set at
+  // all, CLERK_ENABLED is false and the login form's submit handler reports
+  // that sign-in is unavailable rather than collecting a password with no
+  // backend behind it.
   var IS_LOCAL = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
   var IS_DEV_KEY = /^pk_test_/.test(PORTAL_CONFIG.clerkPublishableKey);
   var CLERK_ENABLED = !!PORTAL_CONFIG.clerkPublishableKey && (IS_LOCAL || !IS_DEV_KEY);
-  var PREVIEW_MODE = !CLERK_ENABLED;
-
-  // PREVIEW ONLY: which mock dataset to demo. In production the account type is
-  // NOT chosen here — it comes from Bindly (via Clerk metadata). This just lets
-  // us demo both experiences: add ?demo=commercial (or ?demo=personal) to the
-  // URL. Returns the requested type, or null when no demo param is present.
-  function demoParam() {
-    var m = /[?&](?:demo|type)=(commercial|personal|admin)/.exec(location.search);
-    return m ? m[1] : null;
-  }
 
   // Staff reach the SAME login via the discreet footer "Team Login" link
   // (/portal/?staff=1). There's one login door; role decides the view. This
@@ -81,105 +73,31 @@
   }
 
   // =====================================================================
-  // DATA LAYER — the only place that talks to "the backend".
-  // Today it returns mock data, split by account type (personal vs
-  // commercial). To go live, replace each function body with a real call
-  // to Bindly's API (through a Netlify function that holds the API key
-  // server-side). The UI below never has to change.
+  // DATA LAYER — the only place that talks to the backend. Each method calls
+  // a Netlify function that verifies the signed-in Clerk token, resolves the
+  // caller's Bindly client id from the VERIFIED token (never from anything the
+  // browser sends), and proxies to Bindly's portal read API. The UI below
+  // (renderPolicies etc.) never changes — the backend shapes each response to
+  // match exactly what the renderers expect.
   //
   // Personal clients see homeowners/auto/umbrella-style policies, their
   // documents, and their account. Commercial clients additionally get the
   // Certificates tab + COI request flow, and a company on their profile.
   // =====================================================================
-
-  // TODO(Bindly): the real client "type" comes from the Bindly client
-  // record, not from a login toggle. Once auth is wired, map the signed-in
-  // user -> Bindly client id -> client.type and ignore the UI hint.
-  var MOCK = {
-    personal: {
-      client: { name: "Jordan Rivera", company: "", type: "personal" },
-      policies: [
-        { type: "Homeowners", number: "HO-4471902", carrier: "Travelers", term: "Feb 2026 – Feb 2027", status: "active" },
-        { type: "Personal Auto", number: "PA-8830115", carrier: "Progressive", term: "Jan 2026 – Jul 2026", status: "active", renewsSoon: true },
-        { type: "Personal Umbrella", number: "UMB-220417", carrier: "Chubb", term: "Feb 2026 – Feb 2027", status: "active" },
-        { type: "Valuable Articles", number: "VA-100338", carrier: "Chubb", term: "Feb 2026 – Feb 2027", status: "active" }
-      ],
-      documents: [
-        { name: "Homeowners Policy — 2026.pdf", kind: "Policy", date: "Jan 12, 2026", url: "#" },
-        { name: "Auto ID Cards.pdf", kind: "ID Cards", date: "Jan 12, 2026", url: "#" },
-        { name: "Home Declaration Page.pdf", kind: "Declaration", date: "Jan 12, 2026", url: "#" },
-        { name: "Umbrella Policy — 2026.pdf", kind: "Policy", date: "Feb 2, 2026", url: "#" }
-      ],
-      holders: [],
-      account: {
-        name: "Jordan Rivera", company: "",
-        email: "jordan.rivera@example.com", phone: "(214) 555-0148",
-        address: "4820 Cole Ave, Dallas, TX 75205",
-        contacts: [
-          { id: "c-1", name: "Alex Rivera", role: "Spouse", email: "alex.rivera@example.com", phone: "(214) 555-0149" }
-        ]
-      }
-    },
-    commercial: {
-      client: { name: "Maria Delgado", company: "Acme Roofing LLC", type: "commercial" },
-      policies: [
-        { type: "General Liability", number: "GL-7781204", carrier: "The Hartford", term: "Mar 2026 – Mar 2027", status: "active" },
-        { type: "Commercial Property", number: "CP-4419077", carrier: "Travelers", term: "Mar 2026 – Mar 2027", status: "active" },
-        { type: "Workers' Compensation", number: "WC-6620913", carrier: "AmTrust", term: "Jan 2026 – Jan 2027", status: "active" },
-        { type: "Commercial Auto", number: "CA-5530188", carrier: "Progressive Commercial", term: "Mar 2026 – Mar 2027", status: "active" },
-        { type: "Commercial Umbrella", number: "UMB-330820", carrier: "Chubb", term: "Mar 2026 – Mar 2027", status: "active" }
-      ],
-      documents: [
-        { name: "General Liability Policy — 2026.pdf", kind: "Policy", date: "Feb 20, 2026", url: "#" },
-        { name: "Property Declaration Page.pdf", kind: "Declaration", date: "Feb 20, 2026", url: "#" },
-        { name: "Workers Comp Policy — 2026.pdf", kind: "Policy", date: "Jan 8, 2026", url: "#" },
-        { name: "Commercial Auto ID Cards.pdf", kind: "ID Cards", date: "Feb 20, 2026", url: "#" },
-        { name: "Loss Runs — 2025.pdf", kind: "Loss Runs", date: "Jan 6, 2026", url: "#" }
-      ],
-      holders: [
-        { id: "h-1", name: "ABC Property Management", address: "500 N Akard St, Dallas, TX 75201", status: "issued", date: "Mar 3, 2026", url: "#" },
-        { id: "h-2", name: "City of Dallas", address: "1500 Marilla St, Dallas, TX 75201", status: "issued", date: "Feb 18, 2026", url: "#" }
-      ],
-      account: {
-        name: "Maria Delgado", company: "Acme Roofing LLC",
-        email: "maria@acmeroofing.com", phone: "(214) 555-0192",
-        address: "1200 Commerce St, Suite 400, Dallas, TX 75202",
-        contacts: [
-          { id: "c-1", name: "Dana Ortiz", role: "Billing", email: "dana@acmeroofing.com", phone: "(214) 555-0193" },
-          { id: "c-2", name: "Sam Ortiz", role: "Safety Manager", email: "sam@acmeroofing.com", phone: "(214) 555-0194" }
-        ]
-      }
-    }
-  };
-
-  // Two worlds behind one interface:
-  //   * PREVIEW / demo  -> return the in-memory MOCK data, so the public preview
-  //                        build is fully clickable with no backend or login.
-  //   * LIVE (real client signed in via Clerk) -> call the Netlify functions,
-  //                        which verify the Clerk token, resolve the caller's
-  //                        Bindly client id from the VERIFIED token, and proxy
-  //                        to Bindly's portal read API. The browser never sends
-  //                        its own client id — it's derived server-side.
-  // PREVIEW_MODE decides which: it's true only when Clerk isn't active (see the
-  // CONFIG block). The UI (renderPolicies etc.) is identical either way — the
-  // backend shapes each response to match exactly what the renderers expect.
   var PortalData = {
-    // Which account view is active. In preview it's set by the demo button; in
-    // live mode renderAuthState sets it from the signed-in user's Clerk
-    // account_type (which itself mirrors the Bindly record). Used to pick the
-    // MOCK dataset AND to skip the commercial-only certificates call for
-    // personal clients (whose backend would 403).
+    // Which account view is active. renderAuthState sets it from the signed-in
+    // user's Clerk account_type (which mirrors the Bindly record). Used to skip
+    // the commercial-only certificates call for personal clients (whose backend
+    // would 403).
     _type: "personal",
 
-    // GET documents -> [{ name, kind, date, url }]. In live mode `url` is a
-    // real 15-minute signed link straight from Bindly.
+    // GET documents -> [{ name, kind, date, url }]. `url` is a real 15-minute
+    // signed link straight from Bindly.
     getDocuments: function () {
-      if (PREVIEW_MODE) return Promise.resolve(MOCK[this._type].documents.slice());
       return authedApi("/portal-documents").then(function (b) { return b.documents || []; });
     },
     // GET policies -> [{ type, number, carrier, term, status, renewsSoon }]
     getPolicies: function () {
-      if (PREVIEW_MODE) return Promise.resolve(MOCK[this._type].policies.slice());
       return authedApi("/portal-policies").then(function (b) { return b.policies || []; });
     },
     // GET issued certificates -> [{ id, name, address, status, date, url }].
@@ -187,110 +105,48 @@
     // so short-circuit to [] rather than letting that reject the dashboard load.
     getHolders: function () {
       if (this._type !== "commercial") return Promise.resolve([]);
-      if (PREVIEW_MODE) return Promise.resolve((MOCK[this._type].holders || []).slice());
       return authedApi("/portal-cert-holders").then(function (b) { return b.holders || []; });
     },
     // Self-service issue. Client supplies holder name + address only, so every
     // certificate is standard ACORD 25 wording off the master COI — always
     // issues INSTANTLY. Returns { ok, holder:{ id, name, address, status, date, url } }.
     addHolder: function (data) {
-      if (PREVIEW_MODE) {
-        var street = [data.address1, data.address2].filter(Boolean).join(", ");
-        var region = [data.city, [data.state, data.zip].filter(Boolean).join(" ").trim()].filter(Boolean).join(", ");
-        return Promise.resolve({ ok: true, status: "issued", holder: {
-          id: "h-" + Date.now(),
-          name: data.name,
-          address: [street, region].filter(Boolean).join(", "),
-          status: "issued",
-          date: "Just now",
-          url: "#"
-        }});
-      }
       return authedApi("/portal-cert-holders", { method: "POST", body: data });
     },
     // GET profile -> { name, company, email, phone, address }.
     getAccount: function () {
-      if (PREVIEW_MODE) return Promise.resolve(MOCK[this._type].account);
       return authedApi("/portal-me").then(function (b) { return b.client || {}; });
     },
     // Additional contacts — reference people (billing/HR/etc.), not portal
-    // logins. Live, they're NATIVE to the Bindly client record. Shape:
+    // logins. They're NATIVE to the Bindly client record. Shape:
     // [{ id, name, role, email, phone }].
     getContacts: function () {
-      if (PREVIEW_MODE) return Promise.resolve((MOCK[this._type].account.contacts || []).slice());
       return authedApi("/portal-contacts").then(function (b) { return b.contacts || []; });
     },
     addContact: function (data) {
-      if (PREVIEW_MODE) {
-        var c = { id: "c-" + Date.now(), name: data.name, role: data.role || "", email: data.email || "", phone: data.phone || "" };
-        MOCK[this._type].account.contacts.push(c);
-        return Promise.resolve({ ok: true, contact: c });
-      }
       return authedApi("/portal-contacts", { method: "POST", body: data });
     },
     updateContact: function (id, data) {
-      if (PREVIEW_MODE) {
-        var list = MOCK[this._type].account.contacts;
-        for (var i = 0; i < list.length; i++) {
-          if (list[i].id === id) {
-            list[i] = { id: id, name: data.name, role: data.role || "", email: data.email || "", phone: data.phone || "" };
-            return Promise.resolve({ ok: true, contact: list[i] });
-          }
-        }
-        return Promise.resolve({ ok: false });
-      }
       return authedApi("/portal-contacts?id=" + encodeURIComponent(id), { method: "PUT", body: data });
     },
     removeContact: function (id) {
-      if (PREVIEW_MODE) {
-        var list = MOCK[this._type].account.contacts;
-        MOCK[this._type].account.contacts = list.filter(function (c) { return c.id !== id; });
-        return Promise.resolve({ ok: true });
-      }
       return authedApi("/portal-contacts?id=" + encodeURIComponent(id), { method: "DELETE" });
     },
     isCommercial: function () { return this._type === "commercial"; },
     logout: function () { return Promise.resolve(); }
   };
 
-  // Local view state (mock). Holders added in-session live here.
+  // Local view state. Holders added in-session live here.
   var state = { policies: [], holders: [], commercial: false, contacts: [] };
 
   // =====================================================================
   // ADMIN DATA LAYER — the staff/admin tab (create + manage client logins).
-  // Two worlds, same interface:
-  //   * PREVIEW / demo  -> operates on the in-memory MOCK_ADMIN_USERS below,
-  //                        so the tab is fully clickable with no backend.
-  //   * REAL (staff signed in) -> calls the portal-admin-users function, which
-  //                        talks to Clerk (invite emails, invited/active status).
-  // adminPreview decides which. Set true by the "View demo — IPG Admin" button;
-  // false for a real signed-in staff user.
+  // Each method calls the portal-admin-users function, which talks to Clerk
+  // (invite emails, invited/active status) and Bindly (client lookup by email).
   // =====================================================================
-  var adminPreview = false;
   var adminSelfId = null; // the signed-in staff member's own id (so they can't self-delete)
   var adminIsAdmin = false; // true when the signed-in user is role 'admin' (not just staff)
   var adminState = { users: [], team: [] };
-
-  // Sample data for the demo only — mirrors what Clerk returns in production.
-  var MOCK_ADMIN_USERS = [
-    { id: "u-1", email: "maria@acmeroofing.com", name: "Maria Delgado", bindly_client_id: "BND-10234", account_type: "commercial", role: "client", status: "active", created: "2026-07-02" },
-    { id: "u-2", email: "jordan.rivera@example.com", name: "Jordan Rivera", bindly_client_id: "BND-10891", account_type: "personal", role: "client", status: "active", created: "2026-06-28" },
-    { id: "i-1", email: "dana@brightpathhr.com", name: "Dana Cole", bindly_client_id: "BND-11002", account_type: "commercial", role: "client", status: "invited", created: "2026-07-10" }
-  ];
-  var MOCK_ADMIN_TEAM = [
-    { id: "t-self", email: "cole@ipg.team", name: "Cole LeClair", role: "admin", status: "active", created: "2026-07-01" },
-    { id: "t-2", email: "meagan@ipg.team", name: "Meagan Reyes", role: "staff", status: "active", created: "2026-07-05" },
-    { id: "t-3", email: "newhire@ipg.team", name: "Jamie Park", role: "staff", status: "invited", created: "2026-07-11" }
-  ];
-  // Stand-in for Bindly's client directory, so the "look up by email" flow is
-  // fully demoable without a backend. One email maps to two clients on purpose
-  // (a shared household inbox) to exercise the "pick a match" step too.
-  var MOCK_BINDLY_DIRECTORY = [
-    { client_id: "BND-10234", name: "Acme Roofing LLC", email: "maria@acmeroofing.com", phone: "555-0134", type: "commercial" },
-    { client_id: "BND-10891", name: "Jordan Rivera", email: "jordan.rivera@example.com", phone: "555-0198", type: "personal" },
-    { client_id: "BND-20001", name: "Rivera Household (Personal)", email: "family@example.com", phone: "555-0177", type: "personal" },
-    { client_id: "BND-20002", name: "Rivera Rentals LLC", email: "family@example.com", phone: "555-0177", type: "commercial" }
-  ];
 
   // Attach the signed-in user's Clerk token to every backend call so the server
   // can verify WHO is asking (and re-derive their client id / role) — never
@@ -322,59 +178,31 @@
 
   var AdminData = {
     load: function () {
-      if (adminPreview) return Promise.resolve({ users: MOCK_ADMIN_USERS.slice(), team: MOCK_ADMIN_TEAM.slice() });
       return authedApi("/portal-admin-users").then(function (b) { return { users: b.users || [], team: b.team || [] }; });
     },
     // Find the Bindly client(s) matching an email — the seam the invite form
     // uses instead of asking staff to type a Bindly client id by hand.
     lookupClient: function (email) {
-      if (adminPreview) {
-        var q = String(email || "").trim().toLowerCase();
-        var matches = MOCK_BINDLY_DIRECTORY.filter(function (c) { return c.email.toLowerCase() === q; });
-        return Promise.resolve({ clients: matches });
-      }
       return authedApi("/portal-admin-users", { method: "POST", body: { action: "lookup", email: email } });
     },
     invite: function (data) {
-      if (adminPreview) {
-        var u = { id: "i-" + Date.now(), email: data.email, name: data.name || "",
-                  bindly_client_id: data.bindlyClientId, account_type: data.accountType,
-                  role: "client", status: "invited", created: new Date().toISOString() };
-        MOCK_ADMIN_USERS.unshift(u);
-        return Promise.resolve({ ok: true, user: u });
-      }
       return authedApi("/portal-admin-users", { method: "POST", body: data });
     },
     // Invite a colleague as staff/admin (admin-only, enforced server-side).
     inviteTeam: function (data) {
-      if (adminPreview) {
-        var m = { id: "t-" + Date.now(), email: data.email, name: data.name || "",
-                  role: data.role, status: "invited", created: new Date().toISOString() };
-        MOCK_ADMIN_TEAM.unshift(m);
-        return Promise.resolve({ ok: true, user: m });
-      }
       return authedApi("/portal-admin-users", { method: "POST", body: { email: data.email, name: data.name, role: data.role } });
     },
     resend: function (row) {
-      if (adminPreview) return Promise.resolve({ ok: true });
       return authedApi("/portal-admin-users", { method: "POST", body: {
         action: "resend", id: row.id, email: row.email, role: row.role || "client",
         bindlyClientId: row.bindly_client_id, accountType: row.account_type, name: row.name
       }});
     },
     revoke: function (row) {
-      if (adminPreview) {
-        MOCK_ADMIN_USERS = MOCK_ADMIN_USERS.filter(function (x) { return x.id !== row.id; });
-        return Promise.resolve({ ok: true });
-      }
       return authedApi("/portal-admin-users", { method: "POST", body: { action: "revoke", id: row.id } });
     },
     // Permanently remove an ACTIVE login (deletes the Clerk user).
     remove: function (row) {
-      if (adminPreview) {
-        MOCK_ADMIN_USERS = MOCK_ADMIN_USERS.filter(function (x) { return x.id !== row.id; });
-        return Promise.resolve({ ok: true });
-      }
       return authedApi("/portal-admin-users", { method: "POST", body: { action: "delete", id: row.id } });
     }
   };
@@ -931,7 +759,7 @@
       // NEW id, so reload the list on success — otherwise the row on screen
       // keeps the dead id and a later Revoke/Resend on it fails.
       if (row) AdminData.resend(row)
-        .then(function () { showToast("Invite re-sent to " + row.email + "."); if (!adminPreview) loadUsers(); })
+        .then(function () { showToast("Invite re-sent to " + row.email + "."); loadUsers(); })
         .catch(function (err) { showToast(err && err.message ? err.message : "Couldn’t re-send that invite — try again."); });
     } else if (revokeId) {
       var r2 = findRow(revokeId);
@@ -1029,8 +857,8 @@
     appView.hidden = false;
     siteHeader(false);
     // Team management is admin-only (staff can only manage clients).
-    adminIsAdmin = adminPreview || !!(user && user.role === "admin");
-    adminSelfId = (user && user.id) || (adminPreview ? "t-self" : null);
+    adminIsAdmin = !!(user && user.role === "admin");
+    adminSelfId = (user && user.id) || null;
     setChrome("admin");
     // The Team tab exists only for admins; staff never see it.
     var teamTab = $("teamTab"); if (teamTab) teamTab.hidden = !adminIsAdmin;
@@ -1174,29 +1002,9 @@
   function initAuth() {
     var ticket = getClerkTicket();
     if (CLERK_ENABLED) { initClerk(ticket); if (STAFF_ENTRY && !ticket) applyStaffCopy(); return; }
-    // Preview mode: never collect credentials — the portal isn't connected to
-    // anything, and a real client typing a real password into a mock form is
-    // worse than no form. Hide the login form, offer explicit demo entry.
-    if (loginForm) loginForm.hidden = true;
-    var entry = $("previewEntry");
-    if (entry) entry.hidden = false;
-    var title = $("loginTitle"), sub = $("loginSub");
-    if (title) title.textContent = "Client Portal Preview";
-    if (sub) sub.textContent = "Explore the portal with sample data. Real client logins open here at launch.";
-    function enter(type) {
-      adminPreview = false;
-      PortalData._type = type;
-      showDashboard(MOCK[type].client);
-    }
-    var p = $("demoPersonal"), c = $("demoCommercial"), ad = $("demoAdmin");
-    if (p) p.addEventListener("click", function () { enter("personal"); });
-    if (c) c.addEventListener("click", function () { enter("commercial"); });
-    // Demo the admin experience against in-memory sample data.
-    if (ad) ad.addEventListener("click", function () { adminPreview = true; showAdmin({ name: "IPG Admin" }); });
-    // Deep links (?demo=commercial / ?demo=personal / ?demo=admin) jump straight in.
-    var demo = demoParam();
-    if (demo === "admin") { adminPreview = true; showAdmin({ name: "IPG Admin" }); }
-    else if (demo) enter(demo);
+    // No Clerk key configured — sign-in can't run. Leave the login form visible;
+    // its submit handler reports that sign-in is temporarily unavailable rather
+    // than ever collecting a password with no backend behind it.
     if (STAFF_ENTRY) applyStaffCopy();
   }
 
@@ -1217,9 +1025,6 @@
   }
 
   function initClerk(ticket) {
-    // Keep the native IPG login form; just make sure the preview demo buttons
-    // never show.
-    var entry = $("previewEntry"); if (entry) entry.hidden = true;
     whenClerkReady(function () {
       window.Clerk.load().then(function () {
         // While finishing an invite (setting a password), don't let Clerk's
@@ -1280,7 +1085,6 @@
       // Signed in — build the client context. The browser reads publicMetadata
       // only to choose which view to show; authorization is still enforced
       // server-side off the verified Clerk JWT.
-      adminPreview = false; // a real staff user hits the live backend, not the mock
       var md = Clerk.user.publicMetadata || {};
       var email = Clerk.user.primaryEmailAddress && Clerk.user.primaryEmailAddress.emailAddress;
       var name = Clerk.user.fullName || Clerk.user.firstName || email || "Client";
@@ -1395,12 +1199,10 @@
   initPlaceholderDownloads();
   initAuth();
 
-  // Local-dev hook so the loading/error paths can be exercised from the
-  // console (the mock data layer never fails on its own). Not defined on the
-  // live domain.
+  // Local-dev hook (localhost only) for exercising the invite-accept UI and
+  // poking the live data layers from the console. Not defined on the live domain.
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) {
-    window.__portalDebug = { data: PortalData, reload: loadDashboard,
-      admin: AdminData, showAdmin: function () { adminPreview = true; showAdmin({ name: "IPG Admin" }); },
+    window.__portalDebug = { data: PortalData, reload: loadDashboard, admin: AdminData,
       showAccept: function () { showAcceptView(); var f = $("acEmail"); if (f) f.value = "teammate@ipg.team"; } };
   }
 })();
