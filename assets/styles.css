@@ -142,8 +142,13 @@
   }
   .nav-login::after { display: none; }
   .nav-login:hover { border-color: var(--ipg-blue); background: var(--paper); }
+  /* Client Login shows as a pill next to Get a Quote on desktop; on phones the
+     header would overflow, so it collapses into the hamburger menu instead.
+     The markup carries a copy in both places — CSS shows the right one per width. */
+  .nav-links .nav-login { display: none; }
   @media (max-width: 980px) {
-    .nav-login { margin-left: 0; display: inline-block; }
+    .nav-cta .nav-login { display: none; }
+    .nav-links .nav-login { display: inline-block; margin-left: 0; }
   }
 
   .btn {
