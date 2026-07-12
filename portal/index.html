@@ -47,6 +47,11 @@
   /* ---- Login ---- */
   .portal-auth { min-height: calc(100vh - var(--flag-h)); display: flex; align-items: center; justify-content: center; padding: 48px 20px; }
   .portal-card { width: 100%; max-width: 420px; background: var(--white); border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow-card); padding: 40px 34px; text-align: center; }
+  /* Boot spinner — shown while Clerk resolves whether a session already
+     exists, so a signed-in client refreshing the page never sees the login
+     card flash underneath their dashboard. */
+  .portal-boot-spin { width: 34px; height: 34px; margin: 0 auto; border-radius: 50%; border: 3px solid var(--line); border-top-color: var(--honey, #C98A2B); animation: portal-spin .8s linear infinite; }
+  @keyframes portal-spin { to { transform: rotate(360deg); } }
   .portal-card .logo-img { height: 66px; margin: 0 auto 18px; }
   .portal-card h1 { font-size: 26px; margin: 0 0 8px; }
   .portal-sub { color: var(--slate); font-size: 14.5px; margin: 0 0 26px; }
@@ -189,8 +194,18 @@
   </nav>
 </header>
 
+<!-- BOOT VIEW — shown while Clerk checks for an existing session, so a
+     signed-in client refreshing the page sees a brief spinner instead of the
+     login card flashing before their dashboard loads. -->
+<section id="portalBoot" class="portal-auth">
+  <div class="portal-card">
+    <img class="logo-img" src="../assets/logo.png" alt="Insurance Partner Group">
+    <div class="portal-boot-spin" role="status" aria-label="Loading"></div>
+  </div>
+</section>
+
 <!-- LOGIN VIEW -->
-<section id="portalLogin" class="portal-auth">
+<section id="portalLogin" class="portal-auth" hidden>
   <div class="portal-card">
     <img class="logo-img" src="../assets/logo.png" alt="Insurance Partner Group">
     <h1 id="loginTitle">Client Login</h1>
@@ -422,6 +437,6 @@
   </main>
 </div>
 
-<script src="portal.js?v=29"></script>
+<script src="portal.js?v=30"></script>
 </body>
 </html>

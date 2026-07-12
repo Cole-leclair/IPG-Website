@@ -220,11 +220,16 @@
     });
   }
 
+  var bootView = $("portalBoot");
   var loginView = $("portalLogin");
   var appView = $("portalApp");
   var acceptView = $("portalAccept");
   var loginForm = $("loginForm");
   var loginMsg = $("loginMsg");
+
+  // Hide the boot spinner once we know whether a session exists — called from
+  // every path that reveals login/dashboard/accept, so it never gets stuck.
+  function hideBoot() { if (bootView) bootView.hidden = true; }
 
   // The public ipg.team site header (logo + nav + Get a Quote) shows on the
   // login and set-password screens so the portal reads as part of the main
@@ -1005,6 +1010,8 @@
     // No Clerk key configured — sign-in can't run. Leave the login form visible;
     // its submit handler reports that sign-in is temporarily unavailable rather
     // than ever collecting a password with no backend behind it.
+    hideBoot();
+    if (loginView) loginView.hidden = false;
     if (STAFF_ENTRY) applyStaffCopy();
   }
 
@@ -1015,13 +1022,22 @@
   // card. On success we hold a Clerk session; every future API call (Phase 2)
   // sends its JWT as a Bearer token, and the server re-derives the client id +
   // account type from that VERIFIED token, never trusting the browser.
-  function whenClerkReady(cb) {
+  // onTimeout fires if window.Clerk never shows up (~6s) — without it the boot
+  // spinner would spin forever instead of falling back to the login form.
+  function whenClerkReady(cb, onTimeout) {
     if (window.Clerk) return cb();
     var tries = 0;
     var t = setInterval(function () {
       if (window.Clerk) { clearInterval(t); cb(); }
-      else if (++tries > 120) { clearInterval(t); } // ~6s, then give up
+      else if (++tries > 120) { clearInterval(t); if (onTimeout) onTimeout(); } // ~6s, then give up
     }, 50);
+  }
+
+  function showLoginUnavailable() {
+    hideBoot();
+    if (loginView) loginView.hidden = false;
+    var sub = $("loginSub");
+    if (sub) sub.textContent = "Sign-in is temporarily unavailable. Please try again shortly.";
   }
 
   function initClerk(ticket) {
@@ -1032,15 +1048,13 @@
         window.Clerk.addListener(function () { if (!inAcceptFlow) renderAuthState(); });
         if (ticket) { startAcceptFlow(ticket); return; }
         renderAuthState();
-      }).catch(function () {
-        var sub = $("loginSub");
-        if (sub) sub.textContent = "Sign-in is temporarily unavailable. Please try again shortly.";
-      });
-    });
+      }).catch(showLoginUnavailable);
+    }, showLoginUnavailable);
   }
 
   // ---- Accept an invite natively (set your password on ipg.team) ----
   function showAcceptView() {
+    hideBoot();
     if (loginView) loginView.hidden = true;
     if (appView) appView.hidden = true;
     if (acceptView) acceptView.hidden = false;
@@ -1080,6 +1094,7 @@
   }
 
   function renderAuthState() {
+    hideBoot();
     var Clerk = window.Clerk;
     if (Clerk && Clerk.user) {
       // Signed in — build the client context. The browser reads publicMetadata
