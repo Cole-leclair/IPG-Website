@@ -82,8 +82,6 @@
   /* ---- Chrome ---- */
   .portal-header { position: sticky; top: 0; z-index: 40; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 32px; background: rgba(244,246,250,0.92); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
   .portal-header-left { display: flex; align-items: center; gap: 20px; }
-  .portal-back { font-size: 13.5px; font-weight: 600; color: var(--ipg-blue); text-decoration: none; white-space: nowrap; }
-  .portal-back:hover { text-decoration: underline; }
   .portal-header .logo-img { height: 50px; }
   .portal-user { display: flex; align-items: center; gap: 14px; font-size: 14px; font-weight: 600; color: var(--ink); }
   .btn-sm { padding: 8px 16px; font-size: 13px; }
@@ -210,9 +208,9 @@
     .stat-grid { grid-template-columns: 1fr; }
     .form-grid, .acct-grid, .pcov-grid { grid-template-columns: 1fr; }
     .portal-header, .portal-tabs { padding-left: 18px; padding-right: 18px; }
-    /* On phones the client/company name would collide with "← Main site";
-       drop it (the dashboard greeting already names them) and keep the logo,
-       back link, and Sign out. */
+    /* Drop the client/company name on phones to keep the header compact —
+       the dashboard greeting already names them — and keep the logo and
+       Sign out. */
     .portal-header .logo-img { height: 40px; }
     .portal-header-left { gap: 12px; }
     #pUser { display: none; }
@@ -310,8 +308,7 @@
 <div id="portalApp" hidden>
   <header class="portal-header">
     <div class="portal-header-left">
-      <a class="brand" href="./"><img class="logo-img" src="../assets/logo.png" alt="IPG"></a>
-      <a class="portal-back" href="/">&larr; Main site</a>
+      <a class="brand" href="/" title="Back to ipg.team"><img class="logo-img" src="../assets/logo.png" alt="IPG"></a>
     </div>
     <div class="portal-user"><span id="pUser">Client</span><button id="signOut" class="btn btn-outline btn-sm" type="button">Sign out</button></div>
   </header>
