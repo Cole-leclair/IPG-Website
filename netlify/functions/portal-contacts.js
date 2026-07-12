@@ -13,6 +13,7 @@ var auth = require("./utils/auth");
 var bindly = require("./utils/bindly");
 var respond = require("./utils/respond");
 var audit = require("./utils/audit");
+var ratelimit = require("./utils/ratelimit");
 
 // Field caps mirror the maxlength attributes in portal/index.html — but the
 // server is the one that counts. Never trust the browser to enforce limits.
@@ -53,6 +54,14 @@ exports.handler = async function (event) {
   var ctx;
   try { ctx = await auth.verifyRequest(event); }
   catch (e) { return respond.json(e.status || 401, { error: e.message }); }
+
+  // Reads are generous; writes (add/edit/remove a contact) are tighter.
+  var limited = ratelimit.guard({
+    scope: "portal-contacts",
+    limit: method === "GET" ? 60 : 20,
+    event: event, ctx: ctx
+  });
+  if (limited) return limited;
 
   var id = event.queryStringParameters && event.queryStringParameters.id;
 

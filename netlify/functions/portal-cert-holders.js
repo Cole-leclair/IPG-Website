@@ -11,6 +11,7 @@ var auth = require("./utils/auth");
 var bindly = require("./utils/bindly");
 var respond = require("./utils/respond");
 var audit = require("./utils/audit");
+var ratelimit = require("./utils/ratelimit");
 
 var MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 function fmtDate(s) {
@@ -41,6 +42,15 @@ exports.handler = async function (event) {
   var ctx;
   try { ctx = await auth.verifyRequest(event); }
   catch (e) { return respond.json(e.status || 401, { error: e.message }); }
+
+  // POST issues a real ACORD 25 through Bindly, so it's capped tightly; the GET
+  // read of the holder list is generous.
+  var limited = ratelimit.guard({
+    scope: "portal-cert-holders",
+    limit: method === "POST" ? 10 : 60,
+    event: event, ctx: ctx
+  });
+  if (limited) return limited;
 
   // Server-side authorization — hiding the tab is UX; THIS is the real gate.
   if (ctx.accountType !== "commercial") {

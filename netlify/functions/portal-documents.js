@@ -16,6 +16,7 @@ var auth = require("./utils/auth");
 var bindly = require("./utils/bindly");
 var respond = require("./utils/respond");
 var audit = require("./utils/audit");
+var ratelimit = require("./utils/ratelimit");
 
 var MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 function fmtDate(s) {
@@ -31,6 +32,9 @@ exports.handler = async function (event) {
   var ctx;
   try { ctx = await auth.verifyRequest(event); }
   catch (e) { return respond.json(e.status || 401, { error: e.message }); }
+
+  var limited = ratelimit.guard({ scope: "portal-documents", limit: 60, event: event, ctx: ctx });
+  if (limited) return limited;
 
   try {
     var data = await bindly.getDocuments(ctx.bindlyClientId);

@@ -30,6 +30,7 @@ var clerk = require("./utils/clerk");
 var bindly = require("./utils/bindly");
 var respond = require("./utils/respond");
 var audit = require("./utils/audit");
+var ratelimit = require("./utils/ratelimit");
 
 var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -165,6 +166,15 @@ exports.handler = async function (event) {
   var staff;
   try { staff = await auth.verifyStaff(event); }
   catch (e) { return respond.json(e.status || 401, { error: e.message }); }
+
+  // Per-staff limit. POSTs (invite/resend/lookup/delete) each hit Clerk and/or
+  // Bindly, so they're capped tighter than the GET list refresh.
+  var limited = ratelimit.guard({
+    scope: "portal-admin-users",
+    limit: method === "POST" ? 30 : 60,
+    event: event, ctx: staff
+  });
+  if (limited) return limited;
 
   var redirectUrl = process.env.PORTAL_INVITE_REDIRECT_URL || "";
 

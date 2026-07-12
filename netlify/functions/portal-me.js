@@ -4,6 +4,7 @@
 var auth = require("./utils/auth");
 var bindly = require("./utils/bindly");
 var respond = require("./utils/respond");
+var ratelimit = require("./utils/ratelimit");
 
 // Format Bindly's address (string OR { address1/line1, address2/line2, city,
 // state, zip }) into one display line. Tolerant of either field naming so a
@@ -24,6 +25,9 @@ exports.handler = async function (event) {
   var ctx;
   try { ctx = await auth.verifyRequest(event); }
   catch (e) { return respond.json(e.status || 401, { error: e.message }); }
+
+  var limited = ratelimit.guard({ scope: "portal-me", limit: 60, event: event, ctx: ctx });
+  if (limited) return limited;
 
   try {
     var data = await bindly.getClient(ctx.bindlyClientId);

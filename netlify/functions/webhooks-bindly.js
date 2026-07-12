@@ -3,9 +3,15 @@
 // cache and/or notify the client. Only wire this up once you confirm Bindly
 // can push signed webhooks (ARCHITECTURE.md §9, question 5).
 var respond = require("./utils/respond");
+var ratelimit = require("./utils/ratelimit");
 
 exports.handler = async function (event) {
   if (event.httpMethod !== "POST") return respond.json(405, { error: "method not allowed" });
+
+  // Public POST endpoint — throttle per source IP so an unsigned flood can't
+  // spin the function. (Real Bindly traffic stays well under this.)
+  var limited = ratelimit.guard({ scope: "webhooks-bindly", limit: 60, event: event });
+  if (limited) return limited;
 
   // TODO(Bindly): verify the webhook signature before trusting the payload.
   // Reject anything that doesn't carry a valid signature from Bindly.
