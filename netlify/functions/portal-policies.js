@@ -54,6 +54,12 @@ function humanizeKey(k) {
   if (COVERAGE_LABELS[k]) return COVERAGE_LABELS[k];
   return String(k).replace(/[_-]+/g, " ").replace(/\b\w/g, function (c) { return c.toUpperCase(); });
 }
+// Non-coverage metadata that sometimes rides along in Bindly's `details`
+// object — carrier/regulatory identifiers, not limits or deductibles, so
+// they don't belong in the client-facing coverage grid.
+var EXCLUDED_DETAIL_KEYS = {
+  naic: true, naic_no: true, naic_number: true, naic_code: true, carrier_naic: true
+};
 // Prefix "$" only for plain money-looking values (digits + commas), so we
 // don't mangle things like "Included", "Yes", or a percentage. Plain
 // free-text values are capitalized ("active" -> "Active") since Bindly's
@@ -68,6 +74,7 @@ function fmtValue(v) {
 function coverages(details) {
   if (!details || typeof details !== "object") return [];
   return Object.keys(details).reduce(function (acc, k) {
+    if (EXCLUDED_DETAIL_KEYS[String(k).toLowerCase()]) return acc;
     var raw = details[k];
     // Skip ACORD-style boolean endorsement flags (Additional Insured, Claims
     // Made, Primary & Noncontributory, Subrogation Waived, and similar
