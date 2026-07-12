@@ -104,6 +104,10 @@
   /* ---- Panels & lists ---- */
   .portal-panel { background: var(--white); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow-card); padding: 24px 26px; margin-bottom: 22px; }
   .portal-panel > h2 { margin-top: 0; }
+  .master-coi-card { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  .master-coi-card h2 { margin: 0 0 4px; font-size: 17px; }
+  .master-coi-card .portal-note { margin: 0; }
+  @media (max-width: 620px) { .master-coi-card { flex-direction: column; align-items: flex-start; } }
   .panel-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
   .panel-head h2 { margin: 0; }
   .doc-list { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
@@ -357,6 +361,15 @@
 
     <!-- CERTIFICATES -->
     <div class="ptab-panel" data-panel="certificates" hidden>
+      <!-- Master COI — only rendered if Bindly has one on file -->
+      <div class="portal-panel master-coi-card" id="masterCoiCard" hidden>
+        <div class="master-coi-info">
+          <h2>Master Certificate of Insurance</h2>
+          <p class="portal-note" id="masterCoiMeta"></p>
+        </div>
+        <a class="btn btn-outline btn-sm" id="masterCoiLink" href="#" target="_blank" rel="noopener">Preview</a>
+      </div>
+
       <!-- What the certificate shows -->
       <div class="cert-explainer">
         <h3>What your certificate shows</h3>
@@ -549,6 +562,6 @@
   </main>
 </div>
 
-<script src="portal.js?v=33"></script>
+<script src="portal.js?v=34"></script>
 </body>
 </html>

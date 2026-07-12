@@ -430,6 +430,25 @@
     }).join("") : '<li class="doc-empty">No certificate holders yet.</li>';
   }
 
+  // Master COI card at the top of the Certificates tab — the client's overall
+  // certificate of insurance (as opposed to a holder-specific cert), filed by
+  // Bindly under the "COIs" document category. Hidden entirely if there's
+  // none on file. If more than one exists (e.g. renewed each year), shows the
+  // most recently modified one.
+  function renderMasterCoi() {
+    var card = $("masterCoiCard");
+    if (!card) return;
+    var cois = state.documents.filter(function (d) { return d.kind === "COIs"; });
+    if (!cois.length) { card.hidden = true; return; }
+    cois.sort(function (a, b) { return new Date(b.date) - new Date(a.date); });
+    var doc = cois[0];
+    var meta = [doc.name, doc.date].filter(Boolean).join(" · ");
+    $("masterCoiMeta").textContent = meta;
+    var link = $("masterCoiLink");
+    link.href = doc.url || "#";
+    card.hidden = false;
+  }
+
   function updateStats() {
     // "Active policies" counts only policies that are actually active.
     var activeCount = state.policies.filter(function (p) { return p.status === "active"; }).length;
@@ -808,6 +827,7 @@
       var search = $("docSearch"); if (search) search.value = "";
       renderDocGroups("");
       renderHolders();
+      renderMasterCoi();
       renderAccount(r[3]);
       renderContacts();
       updateStats();
@@ -1530,7 +1550,7 @@
         { name: "Auto ID Card.pdf", kind: "ID Cards", date: "Mar 3, 2024", url: "#" },
         { name: "GL Dec Page.pdf", kind: "Declarations", date: "May 30, 2025", url: "#" },
         { name: "2025 Loss Runs.pdf", kind: "Loss Runs", date: "Jun 1, 2026", url: "#" }
-      ];
+      ].concat(commercial ? [{ name: "Acosta Drilling Inc - Master COI.pdf", kind: "COIs", date: "Jun 15, 2026", url: "#" }] : []);
       state.holders = commercial ? [
         { id: "c1", name: "City of Dallas", address: "1500 Marilla St, Dallas, TX 75201", status: "issued", date: "Jul 1, 2026", url: "#" }
       ] : [];
@@ -1546,6 +1566,7 @@
       var search = $("docSearch"); if (search) search.value = "";
       renderDocGroups("");
       renderHolders();
+      renderMasterCoi();
       renderAccount({ name: commercial ? "Acosta Drilling Inc" : "Jared Viracola",
         company: commercial ? "Acosta Drilling Inc" : "", email: "client@example.com", phone: "214-555-0100",
         address: "123 Main St, Dallas, TX 75201",
