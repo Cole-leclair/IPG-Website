@@ -798,11 +798,23 @@
     function renderConfirm(p) {
       var rows = [["Email", p.email]];
       if (p.name) rows.push(["Name", p.name]);
-      rows.push(["Account type", cap(p.accountType)], ["Bindly client", p.bindlyClientId]);
-      $("inviteConfirmBody").innerHTML = rows.map(function (r) {
+      var html = rows.map(function (r) {
         return '<div class="acct-item"><div class="k">' + esc(r[0]) + '</div><div class="v">' + esc(r[1] || "—") + '</div></div>';
       }).join("");
-      $("inviteConfirmMsg").textContent = "";
+      // Account type is auto-detected from Bindly, but Bindly's data has been
+      // wrong or missing for real clients (Bobby Jones, Haven Swarts) — so
+      // this is an editable dropdown, not a static label, and staff's choice
+      // here always wins over whatever Bindly says.
+      html += '<div class="acct-item"><div class="k">Account type</div><div class="v">' +
+        '<select id="ivConfirmType">' +
+        '<option value="personal"' + (p.accountType === "commercial" ? "" : " selected") + '>Personal</option>' +
+        '<option value="commercial"' + (p.accountType === "commercial" ? " selected" : "") + '>Commercial</option>' +
+        '</select></div></div>';
+      html += '<div class="acct-item"><div class="k">Bindly client</div><div class="v">' + esc(p.bindlyClientId || "—") + '</div></div>';
+      $("inviteConfirmBody").innerHTML = html;
+      var cmsg = $("inviteConfirmMsg");
+      cmsg.className = "portal-msg";
+      cmsg.textContent = "Auto-detected from Bindly — change the account type above if it looks wrong.";
     }
 
     function chooseMatch(email, match) {
@@ -864,6 +876,8 @@
 
     $("inviteSendBtn").addEventListener("click", function () {
       if (!pending) return;
+      var typeSel = $("ivConfirmType");
+      if (typeSel) pending.accountType = typeSel.value === "commercial" ? "commercial" : "personal";
       var cmsg = $("inviteConfirmMsg"); cmsg.className = "portal-msg"; cmsg.textContent = "Sending…";
       var btn = $("inviteSendBtn"); btn.disabled = true;
       AdminData.invite(pending).then(function (res) {

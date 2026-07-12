@@ -93,22 +93,35 @@ function cleanInvite(input) {
   var email = String(input.email == null ? "" : input.email).trim();
   var client = String(input.bindlyClientId == null ? "" : input.bindlyClientId).trim();
   var name = String(input.name == null ? "" : input.name).trim().slice(0, 120);
+  // Staff's account-type SELECTION on the confirm screen — optional. When
+  // present it overrides whatever Bindly's data says (see verifyBindlyClient
+  // below): Bindly's `type` field has repeatedly come back wrong or empty for
+  // real clients (Bobby Jones, Haven Swarts — both confirmed directly against
+  // Bindly's API), so staff get the final say rather than a field we can't
+  // trust. This is safe to trust from the browser here ONLY because this
+  // whole endpoint is staff-only (auth.verifyStaff) — it is never client input.
+  var accountType = String(input.accountType == null ? "" : input.accountType).trim();
   if (!EMAIL_RE.test(email)) return { error: "a valid client email is required" };
   if (!client) return { error: "no Bindly client selected — look up the client by email first" };
-  return { data: { email: email, client: client, name: name } };
+  if (accountType && accountType !== "personal" && accountType !== "commercial") {
+    return { error: "account type must be personal or commercial" };
+  }
+  return { data: { email: email, client: client, name: name, accountType: accountType } };
 }
 
-// Re-derives account type (and Bindly's name on file) from Bindly itself,
-// rather than trusting whatever the browser sent — the browser only ever
-// gets to SELECT which lookup match it means, never invent the client id
-// or its type. Returns { type, bindlyName } or { error }.
+// Confirms clientId is actually a Bindly match for this EMAIL (so the browser
+// can't invent an unrelated client id — this part is still a hard check, not
+// a suggestion), and returns Bindly's best guess at account type + name as a
+// FALLBACK for when staff didn't override it. Returns { type, bindlyName } or
+// { error }.
 //
-// IMPORTANT: Bindly's search endpoint (GET /clients?q=) does NOT reliably
-// return `type` — their own API docs show it empty in the example response
-// ("Bindly_Portal_API_v1.md"). Only the full profile (GET /clients/{id}, i.e.
-// bindly.getClient) has an authoritative `type`. lookupClient() is still used
-// here to confirm clientId is actually a match for this EMAIL (so the browser
-// can't invent an unrelated client id); getClient() is what we trust for type.
+// IMPORTANT: Bindly's `type` field is not reliable. Their search endpoint
+// (GET /clients?q=) doesn't return it at all (empty string in their own API
+// doc's example), and even the full profile (GET /clients/{id}) has returned
+// wrong or empty values for real clients — see the July 11 "Bobby Jones" /
+// "Haven Swarts" incidents and questions 11/12 in
+// "Bindly Read-API Questions (for Bindly dev).md". Treat this as a fallback
+// default only; the invite handler lets staff override it (see cleanInvite).
 async function verifyBindlyClient(email, clientId) {
   if (!bindly.configured()) return { error: "Bindly portal API isn't configured yet" };
   var found;
@@ -221,7 +234,7 @@ exports.handler = async function (event) {
       if (checkedR.error) return respond.json(400, { error: checkedR.error });
       var verifiedR = await verifyBindlyClient(checkedR.data.email, checkedR.data.client);
       if (verifiedR.error) return respond.json(400, { error: verifiedR.error });
-      checkedR.data.type = verifiedR.type;
+      checkedR.data.type = checkedR.data.accountType || verifiedR.type;
       if (!checkedR.data.name) checkedR.data.name = verifiedR.bindlyName;
       if (body.id) { try { await clerk.revokeInvitation(body.id); } catch (ignore) { /* already gone */ } }
       var reInv = await clerk.createInvitation(checkedR.data.email, metaFor(checkedR.data), redirectUrl);
@@ -241,7 +254,7 @@ exports.handler = async function (event) {
     if (checked.error) return respond.json(400, { error: checked.error });
     var verified = await verifyBindlyClient(checked.data.email, checked.data.client);
     if (verified.error) return respond.json(400, { error: verified.error });
-    checked.data.type = verified.type;
+    checked.data.type = checked.data.accountType || verified.type;
     if (!checked.data.name) checked.data.name = verified.bindlyName;
     var inv = await clerk.createInvitation(checked.data.email, metaFor(checked.data), redirectUrl);
     audit.log({ action: "invite_created", actor: staff.authUserId, target: inv && inv.id, bindlyClientId: checked.data.client });
