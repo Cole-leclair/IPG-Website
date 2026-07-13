@@ -1118,7 +1118,8 @@
 
   function initMyProfileForm() {
     var form = $("myProfileForm");
-    if (!form) return;
+    var modal = $("myProfileModal");
+    if (!form || !modal) return;
     var msg = $("myProfileMsg");
     form.addEventListener("submit", function (e) {
       e.preventDefault();
@@ -1136,6 +1137,28 @@
         }).finally(function () {
           if (btn) { btn.disabled = false; btn.textContent = "Save"; }
         });
+    });
+
+    // Two entry points, one modal: a discreet link on Clients (reachable by
+    // Staff, who never see the Team tab) and a plain button on Team (where
+    // Admins manage this front and center).
+    function openModal() {
+      msg.className = "portal-msg"; msg.textContent = "";
+      loadMyProfile();
+      modal.hidden = false;
+      var phone = $("mpPhone"); if (phone) phone.focus();
+    }
+    function closeModal() { modal.hidden = true; }
+
+    var clientsLink = $("myContactLinkClients");
+    if (clientsLink) clientsLink.addEventListener("click", function (e) { e.preventDefault(); openModal(); });
+    var teamBtn = $("myContactLinkTeam");
+    if (teamBtn) teamBtn.addEventListener("click", openModal);
+    modal.addEventListener("click", function (e) {
+      if (e.target && e.target.closest && e.target.closest("[data-close-profile]")) closeModal();
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && !modal.hidden) closeModal();
     });
   }
 
