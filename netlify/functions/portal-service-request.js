@@ -17,6 +17,7 @@ var ratelimit = require("./utils/ratelimit");
 // The topics offered in the portal UI. Kept server-side too so an arbitrary
 // value can't be injected into the lead card; anything else collapses to "Other".
 var TOPICS = {
+  claim: "Report a claim",
   address: "Update my mailing address",
   driver_vehicle: "Add or remove a driver / vehicle",
   loss_runs: "Request loss runs",

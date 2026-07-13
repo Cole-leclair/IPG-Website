@@ -140,8 +140,14 @@
     logout: function () { return Promise.resolve(); }
   };
 
-  // Local view state. Holders added in-session live here.
-  var state = { policies: [], holders: [], commercial: false, contacts: [], documents: [], clerkName: "" };
+  // Local view state. Holders added in-session live here. docsLoadedAt tracks
+  // when the document listing (with its 15-minute signed URLs) was fetched, so
+  // download clicks know whether the links are still fresh.
+  var state = { policies: [], holders: [], commercial: false, contacts: [], documents: [], clerkName: "", docsLoadedAt: 0 };
+  function clearClientState() {
+    state.policies = []; state.holders = []; state.contacts = []; state.documents = [];
+    state.docsLoadedAt = 0;
+  }
 
   // =====================================================================
   // ADMIN DATA LAYER — the staff/admin tab (create + manage client logins).
@@ -173,7 +179,12 @@
         body: opts.body ? JSON.stringify(opts.body) : undefined
       }).then(function (r) {
         return r.json().catch(function () { return {}; }).then(function (body) {
-          if (!r.ok) throw new Error(body.error || ("Request failed (" + r.status + ")"));
+          if (!r.ok) {
+            // 401 mid-session means the login expired — say that in plain
+            // English instead of surfacing a raw "Request failed (401)".
+            if (r.status === 401) throw new Error("Your session has ended — please refresh the page and sign in again.");
+            throw new Error(body.error || ("Request failed (" + r.status + ")"));
+          }
           return body;
         });
       });
@@ -184,10 +195,11 @@
     load: function () {
       return authedApi("/portal-admin-users").then(function (b) { return { users: b.users || [], team: b.team || [] }; });
     },
-    // Find the Bindly client(s) matching an email — the seam the invite form
-    // uses instead of asking staff to type a Bindly client id by hand.
-    lookupClient: function (email) {
-      return authedApi("/portal-admin-users", { method: "POST", body: { action: "lookup", email: email } });
+    // Find the Bindly client(s) matching a query — an email (classic invite)
+    // or a company/person name (the "add a person to an existing company"
+    // flow) — instead of asking staff to type a Bindly client id by hand.
+    lookupClient: function (q) {
+      return authedApi("/portal-admin-users", { method: "POST", body: { action: "lookup", q: q } });
     },
     invite: function (data) {
       return authedApi("/portal-admin-users", { method: "POST", body: data });
@@ -268,11 +280,16 @@
   }
   function docItem(d) {
     // The category is shown as the group heading, so the row only needs the
-    // cleaned name + date.
+    // cleaned name + date. data-dl-doc lets the download handler re-fetch a
+    // fresh signed URL if this one has gone stale (they expire in ~15 min);
+    // target=_blank keeps the PDF from replacing the portal tab.
+    var idx = state.documents.indexOf(d);
     return '<li><span class="doc-ico">' + FILE_ICON + '</span>' +
       '<span class="doc-meta"><span class="n">' + esc(cleanDocName(d.name)) + '</span>' +
       (d.date ? '<span class="m">' + esc(d.date) + '</span>' : '') + '</span>' +
-      '<a class="doc-dl" href="' + esc(d.url || "#") + '"' + (d.url && d.url !== "#" ? ' download' : '') + '>Download</a></li>';
+      '<a class="doc-dl" href="' + esc(d.url || "#") + '"' +
+      (d.url && d.url !== "#" ? ' data-dl-doc="' + idx + '" target="_blank" rel="noopener"' : '') +
+      '>Download</a></li>';
   }
   function renderDocs(el, items, emptyText) {
     if (!el) return;
@@ -289,12 +306,16 @@
     var i = DOC_CATEGORY_ORDER.indexOf(cat);
     return i === -1 ? DOC_CATEGORY_ORDER.length : i;
   }
+  // Client-friendly display names for Bindly's internal category labels (the
+  // headings render uppercase, so "COIs" would read as the typo-ish "COIS").
+  var DOC_CATEGORY_LABELS = { "COIs": "Certificates", "Cert Holders": "Issued Certificates", "Dec Pages": "Declarations" };
+  function docCategoryLabel(cat) { return DOC_CATEGORY_LABELS[cat] || cat; }
   function renderDocGroups(filter) {
     var wrap = $("docGroups");
     if (!wrap) return;
     var q = (filter || "").trim().toLowerCase();
     var docs = state.documents.filter(function (d) {
-      return !q || (cleanDocName(d.name) + " " + (d.name || "") + " " + (d.kind || "")).toLowerCase().indexOf(q) > -1;
+      return !q || (cleanDocName(d.name) + " " + (d.name || "") + " " + (d.kind || "") + " " + docCategoryLabel(d.kind || "")).toLowerCase().indexOf(q) > -1;
     });
     if (!docs.length) {
       wrap.innerHTML = '<ul class="doc-list"><li class="doc-empty">' +
@@ -314,7 +335,7 @@
     });
     wrap.innerHTML = cats.map(function (cat) {
       return '<div class="doc-group">' +
-        '<div class="doc-group-head"><span class="lbl">' + esc(cat) + '</span>' +
+        '<div class="doc-group-head"><span class="lbl">' + esc(docCategoryLabel(cat)) + '</span>' +
           '<span class="cnt">' + groups[cat].length + '</span></div>' +
         '<ul class="doc-list">' + groups[cat].map(docItem).join("") + '</ul>' +
       '</div>';
@@ -429,7 +450,7 @@
       // can get a fresh dated certificate (e.g. at renewal) without retyping.
       actions += '<a href="#" class="doc-dl" data-reissue="' + i + '">Re-issue</a>';
       if (h.status === "issued" && h.url && h.url !== "#") {
-        actions += '<a class="doc-dl" href="' + esc(h.url) + '" download>Download</a>';
+        actions += '<a class="doc-dl" href="' + esc(h.url) + '" data-dl-holder="' + i + '" target="_blank" rel="noopener">Download</a>';
       }
       actions += '</span>';
       return '<li><span class="doc-ico">' + FILE_ICON + '</span>' +
@@ -455,6 +476,10 @@
     $("masterCoiMeta").textContent = meta;
     var link = $("masterCoiLink");
     link.href = doc.url || "#";
+    // Route through the same fresh-link handler as document rows; without a
+    // URL the placeholder handler explains instead of opening a blank tab.
+    if (doc.url) link.setAttribute("data-dl-doc", state.documents.indexOf(doc));
+    else { link.removeAttribute("data-dl-doc"); link.removeAttribute("target"); }
     card.hidden = false;
   }
 
@@ -465,18 +490,22 @@
     var thirdCard = $("statThird").parentNode;
     thirdCard.removeAttribute("data-goto");
     thirdCard.removeAttribute("data-renew-stat");
+    thirdCard.removeAttribute("role");
+    thirdCard.removeAttribute("tabindex");
+    function makeCardClickable() { thirdCard.setAttribute("role", "button"); thirdCard.setAttribute("tabindex", "0"); }
     if (state.commercial) {
       // Every holder issues instantly now — show the running certificate count.
       $("statThirdLbl").textContent = "Certificates issued";
       $("statThird").textContent = state.holders.length;
       thirdCard.setAttribute("data-goto", "certificates");
+      makeCardClickable();
     } else {
       // Personal clients care about upcoming renewals instead. Clicking the
       // card jumps to (and expands) the policies that are renewing.
       var soon = state.policies.filter(function (p) { return p.renewsSoon; }).length;
       $("statThirdLbl").textContent = "Renewing soon";
       $("statThird").textContent = soon;
-      if (soon > 0) thirdCard.setAttribute("data-renew-stat", "1");
+      if (soon > 0) { thirdCard.setAttribute("data-renew-stat", "1"); makeCardClickable(); }
     }
   }
 
@@ -584,6 +613,7 @@
       var id = $("cId").value;
       var data = { name: $("cName").value, role: $("cRole").value, email: $("cEmail").value, phone: $("cPhone").value };
       submitBtn.disabled = true;
+      submitBtn.textContent = id ? "Saving…" : "Adding…";
       var call = id ? PortalData.updateContact(id, data) : PortalData.addContact(data);
       call.then(function (res) {
         if (res && res.ok) {
@@ -597,7 +627,14 @@
           msg.className = "portal-msg ok";
           msg.textContent = id ? "Contact updated." : "Contact added.";
         }
-      }).finally(function () { submitBtn.disabled = false; });
+      }).catch(function (err) {
+        // A failed save must never look like a success — say what happened.
+        msg.className = "portal-msg err";
+        msg.textContent = (err && err.message) || "We couldn’t save that contact. Please try again.";
+      }).finally(function () {
+        submitBtn.disabled = false;
+        submitBtn.textContent = $("cId").value ? "Save changes" : "Add contact";
+      });
     });
 
     cancelBtn.addEventListener("click", function () { resetForm(); $("contactMsg").textContent = ""; });
@@ -625,6 +662,8 @@
             state.contacts = state.contacts.filter(function (c) { return c.id !== removeId; });
             renderContacts();
             if ($("cId").value === removeId) resetForm();
+          }).catch(function (err) {
+            showToast((err && err.message) || "We couldn’t remove that contact — please try again.");
           });
         }
       });
@@ -658,14 +697,66 @@
           a.hasAttribute("data-resend") || a.hasAttribute("data-revoke") || a.hasAttribute("data-remove-user") ||
           a.hasAttribute("data-users-retry") || a.hasAttribute("data-pick-match") || a.hasAttribute("data-reissue")) return;
       e.preventDefault();
-      showToast("Downloads will be available once your account is connected to live data.");
+      showToast("This document isn’t available for download online — call us at (214) 377-1460 and we’ll send it over.");
+    });
+  }
+
+  // ---- Fresh download links ----
+  // Bindly's signed document URLs expire ~15 minutes after the listing loads.
+  // If a client clicks Download on a page that's been open longer than that,
+  // the link would land on a raw error page — so the click re-fetches the
+  // listing for a fresh URL first. The new tab is opened SYNCHRONOUSLY (before
+  // the fetch) so popup blockers allow it.
+  var FRESH_WINDOW_MS = 13 * 60 * 1000; // refresh with a ~2 min safety margin
+  function initFreshDownloads() {
+    document.addEventListener("click", function (e) {
+      var a = e.target && e.target.closest ? e.target.closest("a[data-dl-doc], a[data-dl-holder]") : null;
+      if (!a) return;
+      var isDoc = a.hasAttribute("data-dl-doc");
+      // Links are still fresh — let the browser follow them normally.
+      if (state.docsLoadedAt && (Date.now() - state.docsLoadedAt) < FRESH_WINDOW_MS) return;
+      e.preventDefault();
+      var win = window.open("", "_blank"); // must be synchronous with the click
+      var idx = Number(a.getAttribute(isDoc ? "data-dl-doc" : "data-dl-holder"));
+      var stale = isDoc ? state.documents[idx] : state.holders[idx];
+      var refresh = isDoc
+        ? PortalData.getDocuments().then(function (docs) {
+            state.documents = docs || [];
+            state.docsLoadedAt = Date.now();
+            var search = $("docSearch");
+            renderDocGroups(search ? search.value : "");
+            renderMasterCoi();
+            // Match the clicked row back up by name + category.
+            var m = state.documents.filter(function (d) {
+              return stale && d.name === stale.name && d.kind === stale.kind;
+            })[0];
+            return (m && m.url) || (stale && stale.url) || "";
+          })
+        : PortalData.getHolders().then(function (holders) {
+            state.holders = holders || [];
+            renderHolders(); updateStats();
+            var m = state.holders.filter(function (h) {
+              return stale && (h.id ? h.id === stale.id : h.name === stale.name);
+            })[0];
+            return (m && m.url) || (stale && stale.url) || "";
+          });
+      refresh.then(function (url) {
+        if (url && url !== "#") { win.location = url; }
+        else { win.close(); showToast("That document isn’t available right now — try refreshing the page."); }
+      }).catch(function () {
+        // Couldn't refresh — fall back to the (possibly stale) original link.
+        if (stale && stale.url && stale.url !== "#") win.location = stale.url;
+        else { win.close(); showToast("That download didn’t work — try refreshing the page."); }
+      });
     });
   }
 
   // ---- Tabs ----
   function activateTab(name) {
     document.querySelectorAll(".ptab").forEach(function (x) {
-      x.classList.toggle("active", x.getAttribute("data-tab") === name);
+      var on = x.getAttribute("data-tab") === name;
+      x.classList.toggle("active", on);
+      x.setAttribute("aria-selected", on ? "true" : "false");
     });
     document.querySelectorAll(".ptab-panel").forEach(function (p) {
       p.hidden = p.getAttribute("data-panel") !== name;
@@ -680,6 +771,16 @@
     document.addEventListener("click", function (e) {
       var el = e.target && e.target.closest ? e.target.closest("[data-goto]") : null;
       if (el) activateTab(el.getAttribute("data-goto"));
+    });
+    // The clickable stat cards are divs, so make Enter/Space work for
+    // keyboard users too (they carry role="button" + tabindex).
+    document.addEventListener("keydown", function (e) {
+      if (e.key !== "Enter" && e.key !== " ") return;
+      var el = e.target && e.target.closest ? e.target.closest(".stat-card[data-goto], .stat-card[data-renew-stat]") : null;
+      if (!el) return;
+      e.preventDefault();
+      if (el.hasAttribute("data-goto")) activateTab(el.getAttribute("data-goto"));
+      else revealRenewing();
     });
   }
 
@@ -805,6 +906,9 @@
   // The mock resolves instantly, but real Bindly-backed calls won't — and one
   // failed request must never leave a client staring at silently-empty panels.
   function setDashboardLoading() {
+    // Drop any previous data immediately — a failed reload must never leave
+    // the last user's documents re-renderable (e.g. via the search box).
+    clearClientState();
     ["policyList", "holderList", "contactList"].forEach(function (id) {
       var el = $(id);
       if (el) el.innerHTML = '<li class="doc-empty">Loading…</li>';
@@ -839,6 +943,7 @@
       state.documents = r[1] || [];
       state.holders = r[2] || [];
       state.contacts = r[4] || [];
+      state.docsLoadedAt = Date.now();
       $("statDocs").textContent = state.documents.length;
       renderPolicies();
       var search = $("docSearch"); if (search) search.value = "";
@@ -886,11 +991,16 @@
         || adminState.team.filter(function (x) { return x.id === id; })[0];
   }
 
-  // One list-row for either a client login or a team member.
-  function rowHtml(u, isTeam) {
+  // One list-row for either a client login or a team member. sharedCounts (for
+  // client rows) maps bindly_client_id -> number of logins on that account, so
+  // companies with several people show it at a glance.
+  function rowHtml(u, isTeam, sharedCounts) {
     var bits = isTeam
       ? [ u.name ? u.email : "", cap(u.role), fmtDate(u.created) ].filter(Boolean)
       : [ u.name ? u.email : "", cap(u.account_type), fmtDate(u.created) ].filter(Boolean);
+    if (!isTeam && sharedCounts && u.bindly_client_id && sharedCounts[u.bindly_client_id] > 1) {
+      bits.push(sharedCounts[u.bindly_client_id] + " logins on this account");
+    }
     var actions;
     if (u.status === "invited") {
       actions = '<span class="contact-actions">' +
@@ -913,8 +1023,12 @@
   function renderUsers() {
     var el = $("userList");
     if (!el) return;
+    var counts = {};
+    adminState.users.forEach(function (u) {
+      if (u.bindly_client_id) counts[u.bindly_client_id] = (counts[u.bindly_client_id] || 0) + 1;
+    });
     el.innerHTML = adminState.users.length
-      ? adminState.users.map(function (u) { return rowHtml(u, false); }).join("")
+      ? adminState.users.map(function (u) { return rowHtml(u, false, counts); }).join("")
       : '<li class="doc-empty">No client logins yet.</li>';
   }
 
@@ -984,18 +1098,55 @@
     var matchesBox = $("inviteMatches");
     var confirmBox = $("inviteConfirm");
     var nameOverride = ""; // what staff typed in the optional Name field, if anything
-    var pending = null;    // { email, name, bindlyClientId, accountType } once a match is chosen
+    var pending = null;    // { email, name, bindlyClientId, accountType, attach } once a match is chosen
+    // attachMode=false: classic "invite the client" (their email must match
+    // Bindly). attachMode=true: "add a person to an existing company" — find
+    // the company first, then type the new person's own name + email.
+    var attachMode = false;
+
+    function applyMode() {
+      var emailLbl = $("ivEmailLbl"), emailInput = $("ivEmail");
+      var nameField = $("ivNameField");
+      var btn = form.querySelector('button[type="submit"]');
+      var note = $("inviteFormNote");
+      var toggle = $("inviteModeToggle");
+      if (attachMode) {
+        if (emailLbl) emailLbl.textContent = "Company name or client email";
+        if (emailInput) { emailInput.type = "text"; emailInput.placeholder = "e.g. Acosta Drilling"; }
+        if (nameField) nameField.hidden = true; // person's name is asked on the confirm step
+        if (btn) btn.textContent = "Find company";
+        if (note) note.innerHTML = "Give an employee or another person their own login on an existing client&rsquo;s account. Find the company first &mdash; you&rsquo;ll enter the person&rsquo;s name and email on the next step.";
+        if (toggle) toggle.textContent = "Back to inviting a client directly";
+      } else {
+        if (emailLbl) emailLbl.textContent = "Client email";
+        if (emailInput) { emailInput.type = "email"; emailInput.placeholder = ""; }
+        if (nameField) nameField.hidden = false;
+        if (btn) btn.textContent = "Look up client";
+        if (note) note.innerHTML = "Create a portal login for a client. They&rsquo;ll get an email to set their own password &mdash; nothing to hand over. Enter their email and we&rsquo;ll look them up in Bindly automatically.";
+        if (toggle) toggle.textContent = "Add a person to an existing company";
+      }
+    }
 
     function resetToForm() {
       matchesBox.hidden = true; confirmBox.hidden = true; form.hidden = false;
     }
 
     function renderConfirm(p) {
-      var rows = [["Email", p.email]];
-      if (p.name) rows.push(["Name", p.name]);
-      var html = rows.map(function (r) {
-        return '<div class="acct-item"><div class="k">' + esc(r[0]) + '</div><div class="v">' + esc(r[1] || "—") + '</div></div>';
-      }).join("");
+      var html = "";
+      if (p.attach) {
+        // Attaching a person to a company: show the company, collect the
+        // person's own name + email right here.
+        html += '<div class="acct-item"><div class="k">Company / client</div><div class="v">' + esc(p.companyName || "—") + '</div></div>';
+        html += '<div class="acct-item"><div class="k">Bindly client</div><div class="v">' + esc(p.bindlyClientId || "—") + '</div></div>';
+        html += '<div class="acct-item"><div class="k">Person&rsquo;s name</div><div class="v"><input type="text" id="ivPersonName" maxlength="120" placeholder="e.g. Maria Lopez"></div></div>';
+        html += '<div class="acct-item"><div class="k">Person&rsquo;s email</div><div class="v"><input type="email" id="ivPersonEmail" maxlength="254" placeholder="their own email"></div></div>';
+      } else {
+        var rows = [["Email", p.email]];
+        if (p.name) rows.push(["Name", p.name]);
+        html += rows.map(function (r) {
+          return '<div class="acct-item"><div class="k">' + esc(r[0]) + '</div><div class="v">' + esc(r[1] || "—") + '</div></div>';
+        }).join("");
+      }
       // Account type is auto-detected from Bindly, but Bindly's data has been
       // wrong or missing for real clients (Bobby Jones, Haven Swarts) — so
       // this is an editable dropdown, not a static label, and staff's choice
@@ -1005,22 +1156,35 @@
         '<option value="personal"' + (p.accountType === "commercial" ? "" : " selected") + '>Personal</option>' +
         '<option value="commercial"' + (p.accountType === "commercial" ? " selected" : "") + '>Commercial</option>' +
         '</select></div></div>';
-      html += '<div class="acct-item"><div class="k">Bindly client</div><div class="v">' + esc(p.bindlyClientId || "—") + '</div></div>';
+      if (!p.attach) {
+        html += '<div class="acct-item"><div class="k">Bindly client</div><div class="v">' + esc(p.bindlyClientId || "—") + '</div></div>';
+      }
       $("inviteConfirmBody").innerHTML = html;
+      var title = $("inviteConfirmTitle");
+      if (title) title.textContent = p.attach ? "Add a person to this account" : "Confirm this client";
+      var warn = $("inviteConfirmWarn");
+      if (warn) {
+        warn.textContent = p.attach
+          ? "This person gets their OWN login (own email + password) that sees this company’s policies, documents, and certificates."
+          : "Double-check this is the right client — sending links this login to the Bindly record above.";
+      }
       var cmsg = $("inviteConfirmMsg");
       cmsg.className = "portal-msg";
-      cmsg.textContent = "Auto-detected from Bindly — change the account type above if it looks wrong.";
+      cmsg.textContent = p.attach ? "" : "Auto-detected from Bindly — change the account type above if it looks wrong.";
     }
 
     function chooseMatch(email, match) {
       pending = {
-        email: email,
-        name: nameOverride || match.name || "",
+        email: attachMode ? "" : email,
+        name: attachMode ? "" : (nameOverride || match.name || ""),
         bindlyClientId: match.client_id,
-        accountType: match.type === "commercial" ? "commercial" : "personal"
+        accountType: match.type === "commercial" ? "commercial" : "personal",
+        attach: attachMode,
+        companyName: match.name || ""
       };
       renderConfirm(pending);
       matchesBox.hidden = true; form.hidden = true; confirmBox.hidden = false;
+      if (attachMode) { var pn = $("ivPersonName"); if (pn) pn.focus(); }
     }
 
     function renderMatches(email, clients) {
@@ -1031,6 +1195,12 @@
           '<span class="m">' + esc(bits.join(" · ")) + '</span></span>' +
           '<span class="contact-actions"><a href="#" class="doc-dl" data-pick-match="' + i + '">Select</a></span></li>';
       }).join("");
+      var head = $("inviteMatchesTitle");
+      if (head) head.textContent = attachMode ? "Select the company" : "Select the right client";
+      var note = $("inviteMatchesNote");
+      if (note) note.textContent = attachMode
+        ? "Pick the client account this person should have access to."
+        : "Bindly found more than one match for this email.";
       $("inviteMatchesList").onclick = function (e) {
         var a = e.target && e.target.closest ? e.target.closest("[data-pick-match]") : null;
         if (!a) return;
@@ -1044,27 +1214,51 @@
       e.preventDefault();
       var msg = $("inviteMsg"); msg.className = "portal-msg"; msg.textContent = "";
       if (!form.checkValidity()) { form.reportValidity(); return; }
-      var email = $("ivEmail").value.trim();
+      var query = $("ivEmail").value.trim();
+      if (attachMode && query.length < 3) {
+        msg.className = "portal-msg err";
+        msg.textContent = "Enter at least a few characters of the company name (or their email).";
+        return;
+      }
       nameOverride = $("ivName").value.trim();
       var btn = form.querySelector('button[type="submit"]');
-      btn.disabled = true; msg.textContent = "Looking up this client in Bindly…";
-      AdminData.lookupClient(email).then(function (res) {
+      btn.disabled = true;
+      msg.textContent = attachMode ? "Searching Bindly…" : "Looking up this client in Bindly…";
+      AdminData.lookupClient(query).then(function (res) {
         var clients = (res && res.clients) || [];
         if (clients.length === 0) {
           msg.className = "portal-msg err";
-          msg.textContent = "No Bindly client found for that email. Double-check it, or confirm which email is on file with the client.";
-        } else if (clients.length === 1) {
+          msg.textContent = attachMode
+            ? "No Bindly client found for that search. Try the company name as it appears in Bindly."
+            : "No Bindly client found for that email. Double-check it, or confirm which email is on file with the client.";
+        } else if (clients.length === 1 && !attachMode) {
           msg.textContent = "";
-          chooseMatch(email, clients[0]);
+          chooseMatch(query, clients[0]);
         } else {
+          // In attach mode always show the picker, even for a single match —
+          // staff should consciously confirm WHICH account they're opening up.
           msg.textContent = "";
-          renderMatches(email, clients);
+          renderMatches(query, clients);
         }
       }).catch(function (err) {
         msg.className = "portal-msg err";
         msg.textContent = err && err.message ? err.message : "Couldn’t look up this client — try again.";
       }).finally(function () { btn.disabled = false; });
     });
+
+    var modeToggle = $("inviteModeToggle");
+    if (modeToggle) {
+      modeToggle.addEventListener("click", function (e) {
+        e.preventDefault();
+        attachMode = !attachMode;
+        form.reset();
+        var msg = $("inviteMsg"); msg.className = "portal-msg"; msg.textContent = "";
+        resetToForm();
+        applyMode();
+        $("ivEmail").focus();
+      });
+      applyMode();
+    }
 
     $("inviteMatchesBackBtn").addEventListener("click", resetToForm);
     $("inviteBackBtn").addEventListener("click", resetToForm);
@@ -1073,7 +1267,21 @@
       if (!pending) return;
       var typeSel = $("ivConfirmType");
       if (typeSel) pending.accountType = typeSel.value === "commercial" ? "commercial" : "personal";
-      var cmsg = $("inviteConfirmMsg"); cmsg.className = "portal-msg"; cmsg.textContent = "Sending…";
+      var cmsg = $("inviteConfirmMsg");
+      if (pending.attach) {
+        // The person's own details are collected on this confirm step.
+        var pEmail = ($("ivPersonEmail") ? $("ivPersonEmail").value : "").trim();
+        var pName = ($("ivPersonName") ? $("ivPersonName").value : "").trim();
+        if (!/^\S+@\S+\.\S+$/.test(pEmail)) {
+          cmsg.className = "portal-msg err";
+          cmsg.textContent = "Enter the person’s email address.";
+          var pe = $("ivPersonEmail"); if (pe) pe.focus();
+          return;
+        }
+        pending.email = pEmail;
+        pending.name = pName;
+      }
+      cmsg.className = "portal-msg"; cmsg.textContent = "Sending…";
       var btn = $("inviteSendBtn"); btn.disabled = true;
       AdminData.invite(pending).then(function (res) {
         if (res && res.ok) {
@@ -1266,8 +1474,10 @@
       // reveals the dashboard on success (a one-time code step appears if
       // required). This form is only ever visible when Clerk is active, so if
       // Clerk somehow isn't loaded we surface an outage rather than pretending
-      // to sign the client in.
-      if (!(CLERK_ENABLED && window.Clerk)) {
+      // to sign the client in. Checking Clerk.client too matters: on a slow
+      // connection window.Clerk can exist before load() has run, and calling
+      // into it then would throw before the button could re-enable.
+      if (!(CLERK_ENABLED && window.Clerk && window.Clerk.client)) {
         loginMsg.className = "portal-msg err";
         loginMsg.textContent = "Sign-in is temporarily unavailable. Please try again shortly.";
         if (btn) { btn.disabled = false; btn.textContent = "Sign In"; }
@@ -1379,7 +1589,15 @@
     var tries = 0;
     var t = setInterval(function () {
       if (window.Clerk) { clearInterval(t); cb(); }
-      else if (++tries > 120) { clearInterval(t); if (onTimeout) onTimeout(); } // ~6s, then give up
+      else if (++tries > 120) { // ~6s: show the fallback, but KEEP waiting —
+        clearInterval(t);      // on slow mobile connections Clerk often lands
+        if (onTimeout) onTimeout(); // a few seconds late, and sign-in should
+        var slowTries = 0;     // recover on its own instead of staying dead.
+        var t2 = setInterval(function () {
+          if (window.Clerk) { clearInterval(t2); cb(); }
+          else if (++slowTries > 110) clearInterval(t2); // give up after ~1 more min
+        }, 500);
+      }
     }, 50);
   }
 
@@ -1395,9 +1613,26 @@
       window.Clerk.load().then(function () {
         // While finishing an invite (setting a password), don't let Clerk's
         // change listener flash the login screen underneath.
-        window.Clerk.addListener(function () { if (!inAcceptFlow) renderAuthState(); });
+        //
+        // Clerk fires this listener on ANY resource change — background session
+        // refreshes included, not just sign-in/out. Re-rendering on every event
+        // used to yank clients back to the Overview tab mid-form, so only
+        // re-render when who's signed in actually changes.
+        function authKey() {
+          var C = window.Clerk;
+          return (C.user ? C.user.id : "out") + ":" + (C.session ? C.session.id : "none");
+        }
+        var lastAuthKey = null;
+        function renderIfAuthChanged() {
+          if (inAcceptFlow) return;
+          var key = authKey();
+          if (key === lastAuthKey) return;
+          lastAuthKey = key;
+          renderAuthState();
+        }
+        window.Clerk.addListener(renderIfAuthChanged);
         if (ticket) { startAcceptFlow(ticket); return; }
-        renderAuthState();
+        renderIfAuthChanged();
       }).catch(showLoginUnavailable);
     }, showLoginUnavailable);
   }
@@ -1465,12 +1700,24 @@
       state.clerkName = name;
       showDashboard({ name: name, company: md.company || "", type: type });
     } else {
-      // Signed out — show the native login form (reset any code step).
+      // Signed out — show the native login form (reset any code step), and
+      // drop the previous user's data so nothing lingers on a shared machine.
+      clearClientState();
       appView.hidden = true;
       loginView.hidden = false;
       siteHeader(true);
       if (loginForm) loginForm.hidden = false;
       if (twoFactorForm) twoFactorForm.hidden = true;
+      var resetFormEl = $("resetForm");
+      if (resetFormEl) resetFormEl.hidden = true;
+      // Restore the normal sub-copy (it may still say "temporarily
+      // unavailable" if Clerk loaded late and sign-in just recovered).
+      var sub = $("loginSub");
+      if (sub) {
+        sub.textContent = STAFF_ENTRY
+          ? "Sign in to manage client portal accounts."
+          : "Access your policies, documents, and certificates of insurance.";
+      }
       window.scrollTo(0, 0);
     }
   }
@@ -1548,7 +1795,138 @@
         ? "We emailed you a 6-digit code. Enter it below to finish signing in."
         : "Enter the code from your authenticator app to finish signing in.";
     }
+    // "Resend code" only makes sense for the emailed code (an authenticator
+    // app generates its own).
+    var resend = $("tfResend"); if (resend) resend.hidden = strategy !== "email_code";
     var code = $("tfCode"); if (code) { code.value = ""; code.focus(); }
+  }
+
+  function backToLogin() {
+    if (twoFactorForm) twoFactorForm.hidden = true;
+    var resetForm = $("resetForm"); if (resetForm) resetForm.hidden = true;
+    if (loginForm) loginForm.hidden = false;
+    var sub = $("loginSub");
+    if (sub) {
+      sub.textContent = STAFF_ENTRY
+        ? "Sign in to manage client portal accounts."
+        : "Access your policies, documents, and certificates of insurance.";
+    }
+    loginMsg.className = "portal-msg"; loginMsg.textContent = "";
+  }
+
+  // Pull Clerk's human-readable explanation out of an API error, with a fallback.
+  function clerkDetail(err, fallback) {
+    var e0 = err && err.errors && err.errors[0];
+    return (e0 && (e0.longMessage || e0.long_message || e0.message)) || fallback;
+  }
+
+  // ---- Extra code-step actions (resend / back) ----
+  function init2faExtras() {
+    var resend = $("tfResend"), back = $("tfBack");
+    if (resend) {
+      resend.addEventListener("click", function (e) {
+        e.preventDefault();
+        if (!(window.Clerk && window.Clerk.client && _tfStrategy === "email_code")) return;
+        var tfMsg = $("tfMsg");
+        window.Clerk.client.signIn.prepareSecondFactor({ strategy: "email_code" })
+          .then(function () { tfMsg.className = "portal-msg ok"; tfMsg.textContent = "A new code is on its way — check your email."; })
+          .catch(function () { tfMsg.className = "portal-msg err"; tfMsg.textContent = "Couldn’t send a new code — go back and sign in again."; });
+      });
+    }
+    if (back) back.addEventListener("click", function (e) { e.preventDefault(); backToLogin(); });
+  }
+
+  // ---- Forgot password (self-service reset via emailed code) ----
+  function initForgotPassword() {
+    var link = $("forgotPw");
+    var resetForm = $("resetForm");
+    if (!link || !resetForm) return;
+    var rpMsg = $("rpMsg");
+
+    function sendResetCode(email) {
+      return window.Clerk.client.signIn.create({
+        strategy: "reset_password_email_code",
+        identifier: email
+      });
+    }
+
+    link.addEventListener("click", function (e) {
+      e.preventDefault();
+      loginMsg.className = "portal-msg"; loginMsg.textContent = "";
+      var email = $("plEmail").value.trim();
+      if (!email || !/^\S+@\S+\.\S+$/.test(email)) {
+        loginMsg.className = "portal-msg err";
+        loginMsg.textContent = "Enter your email above first, then click “Forgot password?” again.";
+        $("plEmail").focus();
+        return;
+      }
+      if (!(CLERK_ENABLED && window.Clerk && window.Clerk.client)) {
+        loginMsg.className = "portal-msg err";
+        loginMsg.textContent = "Sign-in is temporarily unavailable. Please try again shortly.";
+        return;
+      }
+      loginMsg.textContent = "Sending you a reset code…";
+      sendResetCode(email).then(function () {
+        loginForm.hidden = true;
+        resetForm.hidden = false;
+        var sub = $("loginSub");
+        if (sub) sub.textContent = "We emailed a 6-digit code to " + email + ". Enter it below with your new password.";
+        rpMsg.className = "portal-msg"; rpMsg.textContent = "";
+        $("rpCode").value = ""; $("rpCode").focus();
+        loginMsg.textContent = "";
+      }).catch(function (err) {
+        loginMsg.className = "portal-msg err";
+        // Don't reveal whether the email exists — keep the generic wording
+        // unless Clerk says something safe and useful (e.g. rate limited).
+        loginMsg.textContent = "We couldn’t start a reset for that email. Double-check it, or call us at (214) 377-1460.";
+        void err;
+      });
+    });
+
+    var rpResend = $("rpResend");
+    if (rpResend) {
+      rpResend.addEventListener("click", function (e) {
+        e.preventDefault();
+        var email = $("plEmail").value.trim();
+        if (!email) { backToLogin(); return; }
+        sendResetCode(email)
+          .then(function () { rpMsg.className = "portal-msg ok"; rpMsg.textContent = "A new code is on its way — check your email."; })
+          .catch(function () { rpMsg.className = "portal-msg err"; rpMsg.textContent = "Couldn’t send a new code — try again in a minute."; });
+      });
+    }
+    var rpBack = $("rpBack");
+    if (rpBack) rpBack.addEventListener("click", function (e) { e.preventDefault(); backToLogin(); });
+
+    resetForm.addEventListener("submit", function (e) {
+      e.preventDefault();
+      rpMsg.className = "portal-msg"; rpMsg.textContent = "";
+      if (!resetForm.checkValidity()) { resetForm.reportValidity(); return; }
+      var p1 = $("rpPass").value, p2 = $("rpPass2").value;
+      if (p1 !== p2) { rpMsg.className = "portal-msg err"; rpMsg.textContent = "The two passwords don’t match."; return; }
+      var btn = resetForm.querySelector('button[type="submit"]');
+      if (btn) { btn.disabled = true; btn.textContent = "Resetting…"; }
+      window.Clerk.client.signIn.attemptFirstFactor({
+        strategy: "reset_password_email_code",
+        code: $("rpCode").value.trim()
+      }).then(function (res) {
+        if (res.status === "needs_new_password") {
+          return window.Clerk.client.signIn.resetPassword({ password: p1, signOutOfOtherSessions: true });
+        }
+        return res;
+      }).then(function (res) {
+        if (res.status === "complete") {
+          // Signed in with the new password — the Clerk listener reveals the
+          // dashboard from here.
+          return window.Clerk.setActive({ session: res.createdSessionId });
+        }
+        throw new Error("incomplete");
+      }).catch(function (err) {
+        rpMsg.className = "portal-msg err";
+        rpMsg.textContent = clerkDetail(err, "That code wasn’t right, or the password wasn’t accepted. Please try again.");
+      }).finally(function () {
+        if (btn) { btn.disabled = false; btn.textContent = "Reset password & sign in"; }
+      });
+    });
   }
 
   function clerkErrMsg(err) {
@@ -1571,6 +1949,9 @@
   initTeamInviteForm();
   initUserActions();
   initPlaceholderDownloads();
+  initFreshDownloads();
+  init2faExtras();
+  initForgotPassword();
   initAuth();
 
   // Local-dev hook (localhost only) for exercising the invite-accept UI and
@@ -1611,8 +1992,11 @@
       loginView.hidden = true; appView.hidden = false; siteHeader(false);
       setChrome("client");
       var certTab = $("certTab"); if (certTab) certTab.hidden = !commercial;
+      // Mirrors the REAL flow: commercial headers show the business, but the
+      // big greeting names the actual person signed in (see updateHeaderName).
+      state.clerkName = commercial ? "Maria Lopez" : "Jared Viracola";
       $("pUser").textContent = commercial ? "Acosta Drilling Inc" : "Jared Viracola";
-      $("pWelcome").textContent = "Welcome, " + (commercial ? "Acosta Drilling" : "Jared") + ".";
+      $("pWelcome").textContent = "Welcome, " + (commercial ? "Maria Lopez" : "Jared") + ".";
       $("pCompany").textContent = commercial ? "Acosta Drilling Inc" : "";
       renderQuickActions();
       renderPolicies();

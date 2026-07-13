@@ -31,11 +31,11 @@
   var toggle = document.getElementById("menuToggle");
   var links = document.getElementById("navLinks");
   if (toggle && links) {
+    // The open-state styles live in styles.css (.nav-links.open) so the menu
+    // uses the site palette instead of colors hardcoded here.
     toggle.addEventListener("click", function () {
-      var open = links.style.display === "flex";
-      if (open) { links.removeAttribute("style"); toggle.setAttribute("aria-expanded", "false"); return; }
-      links.style.cssText = "display:flex;position:absolute;top:100%;left:0;right:0;background:#F4F6FA;flex-direction:column;padding:20px 32px;border-bottom:1px solid #D3DCE8;gap:18px;";
-      toggle.setAttribute("aria-expanded", "true");
+      var open = links.classList.toggle("open");
+      toggle.setAttribute("aria-expanded", open ? "true" : "false");
     });
   }
   // ---- Reveal on scroll ----
@@ -111,35 +111,14 @@ var DEMO = location.protocol === "file:" ||
       }
     });
   });
-
-  // ---------- Personal: risk explorer ----------
-  var risks = [
-    { chip: "HOM", title: "Fire damage", scenario: "A kitchen fire spreads faster than you\u2019d think.", solution: "Your homeowners policy rebuilds to current code, not just what you paid for it originally." },
-    { chip: "HOM", title: "Personal property", scenario: "Furniture, electronics, and clothing are casualties too.", solution: "Contents coverage replaces what\u2019s inside the house, not just the house itself." },
-    { chip: "HOM", title: "Loss of use", scenario: "A covered loss leaves your home unlivable for months.", solution: "Additional living expense coverage pays for a place to stay while it\u2019s rebuilt." },
-    { chip: "HOM", title: "Valuable possessions", scenario: "Jewelry and fine art often exceed your policy\u2019s built-in limit.", solution: "Scheduling valuable items separately closes that gap." },
-    { chip: "HOM", title: "Medical expenses", scenario: "A guest gets hurt in a backyard game.", solution: "Medical payments coverage handles minor injuries without a liability claim." },
-    { chip: "HOM", title: "Personal liability", scenario: "Someone slips on your front steps.", solution: "Liability coverage handles the claim, the defense, and the settlement." },
-    { chip: "HOM", title: "Backyard equipment", scenario: "Trampolines and playsets aren\u2019t always automatically covered.", solution: "We confirm your policy actually covers the backyard equipment you have." },
-    { chip: "HOM", title: "Online liability", scenario: "A teenager\u2019s social post turns into a defamation claim.", solution: "Personal injury coverage extends liability beyond property damage." },
-    { chip: "AUTO", title: "Umbrella coverage", scenario: "A pool party ends in a lawsuit that outpaces your policy limits.", solution: "An umbrella policy adds another layer of liability on top of home and auto." },
-    { chip: "HOM", title: "Flood damage", scenario: "Standard homeowners policies exclude flood \u2014 by design.", solution: "A separate flood policy covers what your homeowners policy won\u2019t." },
-    { chip: "HOM", title: "Secondary home", scenario: "A second property means a second set of liability exposures.", solution: "We extend coverage, or write a separate policy, so it\u2019s not a gap." },
-    { chip: "SPEC", title: "Collector car", scenario: "A garage-kept classic isn\u2019t rated like a daily driver.", solution: "Specialty auto coverage insures it for what it\u2019s actually worth." },
-    { chip: "SPEC", title: "Wine collection", scenario: "A cellar\u2019s worth of wine is one bad fridge away from a loss.", solution: "Scheduling the collection covers spoilage, not just breakage." },
-    { chip: "HOM", title: "Water damage", scenario: "Burst pipes cause more claims than almost anything else.", solution: "We check that sewer and drain backup is actually included, not excluded." },
-    { chip: "HOM", title: "Off-premises theft", scenario: "A break-in at your car doesn\u2019t fall under auto insurance.", solution: "Off-premises theft coverage protects belongings anywhere, not just at home." }
-  ];
-  var riskPanel = document.getElementById("personalRiskPanel");
-  function renderRisk(i) {
-    var r = risks[i];
-    riskPanel.innerHTML =
-      '<span class="code-chip">' + r.chip + '</span>' +
-      '<h3>' + r.title + '</h3>' +
-      '<p class="scenario">\u201c' + r.scenario + '\u201d</p>' +
-      '<p class="solution">' + r.solution + '</p>' +
-      '<div class="explorer-steps"><span>Tap a spot</span><span class="sep">\u2192</span><span>See the risk</span><span class="sep">\u2192</span><span>See the fix</span></div>';
+  // Deep link into a service form: /service-center/#claim, #pay, #coi, #change
+  // (used by the Business page's "Request a certificate" button, and shareable).
+  if (serviceTabs.length) {
+    var svcHash = (location.hash || "").replace("#", "");
+    var svcTarget = svcHash && document.querySelector('.service-tab[data-task="' + svcHash + '"]');
+    if (svcTarget) svcTarget.click();
   }
+
   document.querySelectorAll("[data-scroll-to]").forEach(function (el) {
     el.addEventListener("click", function (e) {
       e.preventDefault();
@@ -147,18 +126,6 @@ var DEMO = location.protocol === "file:" ||
       if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
     });
   });
-
-  var hotspots = document.querySelectorAll(".hotspot");
-  if (hotspots.length && riskPanel) {
-    renderRisk(0);
-    hotspots.forEach(function (h) {
-      h.addEventListener("click", function () {
-        hotspots.forEach(function (o) { o.classList.remove("active"); });
-        h.classList.add("active");
-        renderRisk(Number(h.dataset.risk));
-      });
-    });
-  }
 
   // ---------- Business: scenario tabs ----------
   var bizScenarios = [

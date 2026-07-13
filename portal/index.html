@@ -59,6 +59,11 @@
   .portal-card .form-field { margin-bottom: 16px; }
   .portal-card .btn-primary { width: 100%; justify-content: center; margin-top: 4px; }
   .portal-help { font-size: 13px; color: var(--slate); margin: 22px 0 0; line-height: 1.6; }
+  /* Small helper links under login/code forms (Forgot password?, Resend code) */
+  .portal-alt { font-size: 13px; text-align: center; margin: 14px 0 0; }
+  .portal-alt a { color: var(--ipg-blue); font-weight: 600; text-decoration: none; }
+  .portal-alt a:hover { text-decoration: underline; }
+  .portal-alt-sep { color: var(--slate); margin: 0 8px; }
   .portal-msg { font-size: 13px; margin: 12px 0 0; min-height: 1em; }
   .portal-msg.err { color: #b23b3b; }
   .portal-msg.ok { color: #1e7a3d; }
@@ -194,7 +199,10 @@
   .form-field.full { grid-column: 1 / -1; }
   .lbl-hint { font-weight: 400; color: var(--slate); font-size: 12px; }
   /* ---- Admin: invite form + confirm ---- */
-  #inviteForm select, #teamInviteForm select { width: 100%; padding: 11px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--white); font: inherit; color: var(--ink); }
+  #inviteForm select, #teamInviteForm select, .invite-confirm select { width: 100%; padding: 11px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--white); font: inherit; color: var(--ink); }
+  /* Inputs inside the invite confirm grid (person name/email on attach mode) */
+  .invite-confirm .acct-item input { width: 100%; padding: 9px 11px; border: 1px solid var(--line); border-radius: 9px; background: var(--white); font: inherit; font-size: 14px; color: var(--ink); }
+  .invite-confirm .acct-item input:focus { outline: none; border-color: var(--ipg-blue); }
   .invite-confirm { margin-top: 6px; border: 1px solid var(--line); border-radius: 12px; padding: 20px 22px; background: var(--paper); }
   .invite-confirm h3 { margin: 0 0 14px; font-size: 15px; }
   .invite-confirm-actions { display: flex; gap: 10px; flex-wrap: wrap; }
@@ -216,6 +224,10 @@
     .stat-grid { grid-template-columns: 1fr; }
     .form-grid, .acct-grid, .pcov-grid { grid-template-columns: 1fr; }
     .portal-header, .portal-tabs { padding-left: 18px; padding-right: 18px; }
+    /* Wrap the tabs onto a second row on phones — an overflow scroller hid
+       Service/Account off-screen with no hint they existed. */
+    .portal-tabs { flex-wrap: wrap; overflow-x: visible; }
+    .ptab { padding: 12px 12px; }
     /* Drop the client/company name on phones to keep the header compact —
        the dashboard greeting already names them — and keep the logo and
        Sign out. */
@@ -280,6 +292,7 @@
       <div class="form-field"><label for="plEmail">Email</label><input id="plEmail" type="email" autocomplete="email" required></div>
       <div class="form-field"><label for="plPass">Password</label><input id="plPass" type="password" autocomplete="current-password" required></div>
       <button class="btn btn-primary" type="submit">Sign In</button>
+      <p class="portal-alt"><a href="#" id="forgotPw">Forgot password?</a></p>
       <p class="portal-msg" id="loginMsg" aria-live="polite"></p>
     </form>
     <!-- Shown only when Clerk needs a one-time email/authenticator code. -->
@@ -289,7 +302,20 @@
         <input id="tfCode" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" required>
       </div>
       <button class="btn btn-primary" type="submit">Verify &amp; sign in</button>
+      <p class="portal-alt"><a href="#" id="tfResend">Resend code</a><span class="portal-alt-sep">·</span><a href="#" id="tfBack">Back to sign in</a></p>
       <p class="portal-msg" id="tfMsg" aria-live="polite"></p>
+    </form>
+    <!-- Shown after "Forgot password?" — emailed code + new password. -->
+    <form id="resetForm" novalidate hidden>
+      <div class="form-field">
+        <label for="rpCode">Code from your email</label>
+        <input id="rpCode" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" required>
+      </div>
+      <div class="form-field"><label for="rpPass">New password</label><input id="rpPass" type="password" autocomplete="new-password" minlength="8" required></div>
+      <div class="form-field"><label for="rpPass2">Confirm new password</label><input id="rpPass2" type="password" autocomplete="new-password" minlength="8" required></div>
+      <button class="btn btn-primary" type="submit">Reset password &amp; sign in</button>
+      <p class="portal-alt"><a href="#" id="rpResend">Resend code</a><span class="portal-alt-sep">·</span><a href="#" id="rpBack">Back to sign in</a></p>
+      <p class="portal-msg" id="rpMsg" aria-live="polite"></p>
     </form>
     <p class="portal-help">Accounts are set up by IPG. Need access? <a href="/contact/">Contact us</a> or call (214)&nbsp;377-1460.</p>
   </div>
@@ -321,14 +347,14 @@
     <div class="portal-user"><span id="pUser">Client</span><button id="signOut" class="btn btn-outline btn-sm" type="button">Sign out</button></div>
   </header>
 
-  <nav class="portal-tabs" id="portalTabs">
-    <button class="ptab active" type="button" data-tab="overview">Overview</button>
-    <button class="ptab" type="button" data-tab="documents">Documents</button>
-    <button class="ptab" type="button" data-tab="certificates" id="certTab">Certificates</button>
-    <button class="ptab" type="button" data-tab="service">Service</button>
-    <button class="ptab" type="button" data-tab="account">Account</button>
-    <button class="ptab" type="button" data-tab="admin" id="adminTab" hidden>Clients</button>
-    <button class="ptab" type="button" data-tab="team" id="teamTab" hidden>Team</button>
+  <nav class="portal-tabs" id="portalTabs" role="tablist" aria-label="Portal sections">
+    <button class="ptab active" type="button" role="tab" aria-selected="true" data-tab="overview">Overview</button>
+    <button class="ptab" type="button" role="tab" aria-selected="false" data-tab="documents">Documents</button>
+    <button class="ptab" type="button" role="tab" aria-selected="false" data-tab="certificates" id="certTab">Certificates</button>
+    <button class="ptab" type="button" role="tab" aria-selected="false" data-tab="service">Service</button>
+    <button class="ptab" type="button" role="tab" aria-selected="false" data-tab="account">Account</button>
+    <button class="ptab" type="button" role="tab" aria-selected="false" data-tab="admin" id="adminTab" hidden>Clients</button>
+    <button class="ptab" type="button" role="tab" aria-selected="false" data-tab="team" id="teamTab" hidden>Team</button>
   </nav>
 
   <main class="portal-main">
@@ -339,7 +365,7 @@
     <div class="ptab-panel" data-panel="overview">
       <div class="stat-grid">
         <div class="stat-card"><div class="num" id="statPolicies">—</div><div class="lbl">Active policies</div></div>
-        <div class="stat-card" data-goto="documents"><div class="num" id="statDocs">—</div><div class="lbl">Documents on file</div></div>
+        <div class="stat-card" data-goto="documents" role="button" tabindex="0"><div class="num" id="statDocs">—</div><div class="lbl">Documents on file</div></div>
         <div class="stat-card"><div class="num" id="statThird">—</div><div class="lbl" id="statThirdLbl">Certificates issued</div></div>
       </div>
       <div class="quick-actions" id="quickActions"></div>
@@ -427,6 +453,8 @@
         <form id="serviceForm" novalidate>
           <div class="form-field"><label for="svcTopic">What do you need?</label>
             <select id="svcTopic" required>
+              <option value="" disabled selected>Select one…</option>
+              <option value="claim">Report a claim</option>
               <option value="address">Update my mailing address</option>
               <option value="driver_vehicle">Add or remove a driver / vehicle</option>
               <option value="loss_runs">Request loss runs</option>
@@ -479,22 +507,23 @@
     <div class="ptab-panel" data-panel="admin" hidden>
       <div class="portal-panel">
         <h2>Add a client login</h2>
-        <p class="portal-note" style="margin:0 0 16px;">Create a portal login for a client. They&rsquo;ll get an email to set their own password &mdash; nothing to hand over. Enter their email and we&rsquo;ll look them up in Bindly automatically.</p>
+        <p class="portal-note" id="inviteFormNote" style="margin:0 0 16px;">Create a portal login for a client. They&rsquo;ll get an email to set their own password &mdash; nothing to hand over. Enter their email and we&rsquo;ll look them up in Bindly automatically.</p>
 
-        <!-- Step 1: email -->
+        <!-- Step 1: email (or, in "add a person" mode, a company search) -->
         <form id="inviteForm" novalidate>
           <div class="form-grid">
-            <div class="form-field"><label for="ivEmail">Client email</label><input id="ivEmail" type="email" maxlength="254" autocomplete="off" required></div>
-            <div class="form-field"><label for="ivName">Name <span class="lbl-hint">(optional override)</span></label><input id="ivName" type="text" maxlength="120"></div>
+            <div class="form-field"><label for="ivEmail" id="ivEmailLbl">Client email</label><input id="ivEmail" type="email" maxlength="254" autocomplete="off" required></div>
+            <div class="form-field" id="ivNameField"><label for="ivName">Name <span class="lbl-hint">(optional override)</span></label><input id="ivName" type="text" maxlength="120"></div>
           </div>
           <button class="btn btn-primary btn-sm" type="submit">Look up client</button>
           <p class="portal-msg" id="inviteMsg" aria-live="polite"></p>
         </form>
+        <p class="portal-note" style="margin-top:14px;">Need to give an employee or family member their own login on an existing account? <a href="#" id="inviteModeToggle">Add a person to an existing company</a></p>
 
-        <!-- Step 1b: Bindly found more than one match for this email — pick one -->
+        <!-- Step 1b: Bindly found more than one match — pick one -->
         <div id="inviteMatches" class="invite-confirm" hidden>
-          <h3>Select the right client</h3>
-          <p class="portal-note" style="margin:0 0 14px;">Bindly found more than one match for this email.</p>
+          <h3 id="inviteMatchesTitle">Select the right client</h3>
+          <p class="portal-note" id="inviteMatchesNote" style="margin:0 0 14px;">Bindly found more than one match for this email.</p>
           <ul class="doc-list" id="inviteMatchesList"></ul>
           <div class="invite-confirm-actions">
             <button class="btn btn-outline btn-sm" type="button" id="inviteMatchesBackBtn">Back</button>
@@ -503,7 +532,7 @@
 
         <!-- Step 2: confirm the client before the invite goes out -->
         <div id="inviteConfirm" class="invite-confirm" hidden>
-          <h3>Confirm this client</h3>
+          <h3 id="inviteConfirmTitle">Confirm this client</h3>
           <div class="acct-grid" id="inviteConfirmBody"></div>
           <p class="portal-note" id="inviteConfirmWarn" style="margin:14px 0 16px;">Double-check this is the right client &mdash; sending links this login to the Bindly record above.</p>
           <div class="invite-confirm-actions">
@@ -582,6 +611,6 @@
   </main>
 </div>
 
-<script src="portal.js?v=36"></script>
+<script src="portal.js?v=37"></script>
 </body>
 </html>

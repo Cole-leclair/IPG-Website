@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#2B5EA7">
-<title>IPG</title>
+<title>Insurance Partner Group | Independent Insurance Agency in Dallas, TX</title>
 <meta name="description" content="Independent insurance agency in Dallas, TX helping individuals and businesses compare coverage across carriers — personal, business, and employee benefits insurance.">
 <link rel="canonical" href="https://ipg.team/">
 <meta property="og:type" content="website">
@@ -29,7 +29,7 @@
       <img class="logo-img" src="/assets/logo.png" alt="Insurance Partner Group">
     </a>
     <div class="nav-links" id="navLinks">
-      <a href="/" data-nav="home" class="active">Home</a>
+      <a href="/" data-nav="home" class="active" aria-current="page">Home</a>
       <a href="/personal-insurance/" data-nav="personal">Personal</a>
       <a href="/business-insurance/" data-nav="business">Business</a>
       <a href="/employee-benefits/" data-nav="benefits">Benefits</a>
@@ -64,12 +64,14 @@
         <div class="hero-quote reveal in">
           <h2>Get a fast quote</h2>
           <p class="sub">Tell us the basics &mdash; a real person follows up, not a robocall.</p>
+          <div class="form-success" id="heroFormSuccess">Thanks! We’ve got your request &mdash; someone from our team will reach out shortly. Prefer to talk now? Call (214)&nbsp;377-1460.</div>
           <form id="heroForm" name="home-quote" method="POST" action="/" data-netlify="true" data-netlify-honeypot="bot-field" novalidate>
             <input type="hidden" name="form-name" value="home-quote">
             <input type="hidden" name="lead_type" value="Quote Request (Home page)">
             <p class="hp-field" hidden aria-hidden="true"><label>Do not fill this out if you’re human: <input name="bot-field" tabindex="-1" autocomplete="off"></label></p>
             <div class="form-field"><label for="hqName">Name</label><input id="hqName" name="name" type="text" autocomplete="name" required></div>
             <div class="form-field"><label for="hqPhone">Phone</label><input id="hqPhone" name="phone" type="tel" autocomplete="tel" required></div>
+            <div class="form-field"><label for="hqEmail">Email</label><input id="hqEmail" name="email" type="email" autocomplete="email" required></div>
             <div class="form-field">
               <label for="hqType">What are you insuring?</label>
               <select id="hqType" name="type" required>
@@ -83,7 +85,6 @@
             <button class="btn btn-primary" type="submit">Get My Quote</button>
             <p class="form-note">Or call <a href="tel:12143771460" style="color:var(--ipg-blue); font-weight:600;">(214) 377-1460</a></p>
           </form>
-          <div class="form-success" id="heroFormSuccess">Thanks! We’ve got your request &mdash; someone from our team will reach out shortly. Prefer to talk now? Call (214)&nbsp;377-1460.</div>
         </div>
       </div>
     </div>
@@ -228,7 +229,7 @@
       </div>
     </div>
     <div class="foot-bottom">
-      <span>&copy; <span class="tnum">2026</span> Insurance Partner Group LLC <span class="foot-sep" aria-hidden="true">·</span> <a href="/portal/?staff=1" class="foot-staff">Team Login</a></span>
+      <span>&copy; <span class="tnum">2026</span> Insurance Partner Group LLC <span class="foot-sep" aria-hidden="true">·</span> <a href="/portal/?staff=1" class="foot-staff">Team Login</a> <span class="foot-sep" aria-hidden="true">&middot;</span> <a href="/privacy/" class="foot-staff">Privacy Policy</a></span>
       <address>710 E Park Blvd Suite 204B, Plano, TX 75074</address>
     </div>
   </div>

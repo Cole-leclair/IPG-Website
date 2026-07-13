@@ -110,14 +110,29 @@ function cleanInvite(input) {
   if (accountType && accountType !== "personal" && accountType !== "commercial") {
     return { error: "account type must be personal or commercial" };
   }
-  return { data: { email: email, client: client, name: name, accountType: accountType } };
+  // attach=true marks an "additional person on an existing client" invite —
+  // the email intentionally differs from the Bindly record (see
+  // verifyBindlyClient). Boolean-coerced here so it's never a truthy string
+  // surprise later.
+  var attach = input.attach === true || input.attach === "true";
+  return { data: { email: email, client: client, name: name, accountType: accountType, attach: attach } };
 }
 
-// Confirms clientId is actually a Bindly match for this EMAIL (so the browser
-// can't invent an unrelated client id — this part is still a hard check, not
-// a suggestion), and returns Bindly's best guess at account type + name as a
-// FALLBACK for when staff didn't override it. Returns { type, bindlyName } or
-// { error }.
+// Confirms the chosen Bindly client for an invite. Two modes:
+//
+// CLASSIC (attach=false): the invited email must itself match the Bindly
+// record — clientId has to be one of the results of looking up that email.
+// This is the default for inviting the client themselves.
+//
+// ATTACH (attach=true): the invited person is an EMPLOYEE/additional person
+// whose email is deliberately NOT on the Bindly record (e.g. an office
+// manager getting access to the company's portal). Staff explicitly selected
+// the company, so we only verify the client id actually exists in Bindly —
+// the email-match check is intentionally skipped. Safe because this endpoint
+// is staff-only (auth.verifyStaff) and every attach-invite is audit-logged.
+//
+// Returns Bindly's best guess at account type + name as a FALLBACK for when
+// staff didn't override it. Returns { type, bindlyName } or { error }.
 //
 // IMPORTANT: Bindly's `type` field is not reliable. Their search endpoint
 // (GET /clients?q=) doesn't return it at all (empty string in their own API
@@ -126,20 +141,29 @@ function cleanInvite(input) {
 // "Haven Swarts" incidents and questions 11/12 in
 // "Bindly Read-API Questions (for Bindly dev).md". Treat this as a fallback
 // default only; the invite handler lets staff override it (see cleanInvite).
-async function verifyBindlyClient(email, clientId) {
+async function verifyBindlyClient(email, clientId, attach) {
   if (!bindly.configured()) return { error: "Bindly portal API isn't configured yet" };
-  var found;
-  try { found = await bindly.lookupClient(email); }
-  catch (e) { return { error: "couldn't verify this client with Bindly: " + e.message }; }
-  var list = (found && found.clients) || [];
-  var match = list.filter(function (c) { return String(c.client_id) === clientId; })[0];
-  if (!match) return { error: "that client no longer matches a Bindly record for this email — look it up again" };
+  var matchName = "";
+  if (!attach) {
+    var found;
+    try { found = await bindly.lookupClient(email); }
+    catch (e) { return { error: "couldn't verify this client with Bindly: " + e.message }; }
+    var list = (found && found.clients) || [];
+    var match = list.filter(function (c) { return String(c.client_id) === clientId; })[0];
+    if (!match) return { error: "that client no longer matches a Bindly record for this email — look it up again" };
+    matchName = match.name || "";
+  }
   var profile;
   try { profile = await bindly.getClient(clientId); }
-  catch (e2) { return { error: "couldn't verify this client's account type with Bindly: " + e2.message }; }
+  catch (e2) {
+    return { error: attach
+      ? "couldn't find that Bindly client — look up the company again"
+      : "couldn't verify this client's account type with Bindly: " + e2.message };
+  }
+  var p = (profile && profile.client) || profile || {};
   return {
-    type: (profile && profile.type === "commercial") ? "commercial" : "personal",
-    bindlyName: (profile && profile.name) || match.name || ""
+    type: (p.type === "commercial") ? "commercial" : "personal",
+    bindlyName: p.name || matchName || ""
   };
 }
 
@@ -199,11 +223,17 @@ exports.handler = async function (event) {
     }
 
     if (action === "lookup") {
-      var lkEmail = String(body.email == null ? "" : body.email).trim();
-      if (!EMAIL_RE.test(lkEmail)) return respond.json(400, { error: "a valid email is required" });
+      // Accepts an email (classic invite flow) OR a free-text query — company
+      // name, person name, or email — for the "add a person to an existing
+      // company" flow. Bindly's /clients?q= searches name/email/phone.
+      var lkQuery = String(body.q != null ? body.q : (body.email == null ? "" : body.email)).trim();
+      var isEmail = EMAIL_RE.test(lkQuery);
+      if (!isEmail && lkQuery.length < 3) {
+        return respond.json(400, { error: "enter at least 3 characters (a name or email) to search" });
+      }
       if (!bindly.configured()) return respond.json(501, { error: "Bindly portal API isn't configured yet" });
       var lkFound;
-      try { lkFound = await bindly.lookupClient(lkEmail); }
+      try { lkFound = await bindly.lookupClient(lkQuery); }
       catch (e0) { return respond.json(e0.status || 502, { error: e0.message }); }
       return respond.json(200, { clients: (lkFound && lkFound.clients) || [] });
     }
@@ -247,13 +277,19 @@ exports.handler = async function (event) {
       }
       var checkedR = cleanInvite(body);
       if (checkedR.error) return respond.json(400, { error: checkedR.error });
-      var verifiedR = await verifyBindlyClient(checkedR.data.email, checkedR.data.client);
+      // A resend can be for an attach-invite (employee email not on the Bindly
+      // record), so verify in attach mode whenever the strict email-match
+      // fails — the id still has to be a real Bindly client either way.
+      var verifiedR = await verifyBindlyClient(checkedR.data.email, checkedR.data.client, checkedR.data.attach);
+      if (verifiedR.error && !checkedR.data.attach) {
+        verifiedR = await verifyBindlyClient(checkedR.data.email, checkedR.data.client, true);
+      }
       if (verifiedR.error) return respond.json(400, { error: verifiedR.error });
       checkedR.data.type = checkedR.data.accountType || verifiedR.type;
       if (!checkedR.data.name) checkedR.data.name = verifiedR.bindlyName;
       if (body.id) { try { await clerk.revokeInvitation(body.id); } catch (ignore) { /* already gone */ } }
       var reInv = await clerk.createInvitation(checkedR.data.email, metaFor(checkedR.data), redirectUrl);
-      await audit.log({ action: "invite_resent", actor: staff.authUserId, target: reInv && reInv.id, bindlyClientId: checkedR.data.client, event: event });
+      await audit.log({ action: checkedR.data.attach ? "invite_resent_attach" : "invite_resent", actor: staff.authUserId, target: reInv && reInv.id, bindlyClientId: checkedR.data.client, event: event });
       return respond.json(200, { ok: true, user: inviteToRow(reInv) });
     }
 
@@ -267,12 +303,14 @@ exports.handler = async function (event) {
     }
     var checked = cleanInvite(body);
     if (checked.error) return respond.json(400, { error: checked.error });
-    var verified = await verifyBindlyClient(checked.data.email, checked.data.client);
+    var verified = await verifyBindlyClient(checked.data.email, checked.data.client, checked.data.attach);
     if (verified.error) return respond.json(400, { error: verified.error });
     checked.data.type = checked.data.accountType || verified.type;
-    if (!checked.data.name) checked.data.name = verified.bindlyName;
+    // For an attach-invite the Bindly name is the COMPANY, not the person —
+    // only fall back to it on classic invites where they're the same client.
+    if (!checked.data.name && !checked.data.attach) checked.data.name = verified.bindlyName;
     var inv = await clerk.createInvitation(checked.data.email, metaFor(checked.data), redirectUrl);
-    await audit.log({ action: "invite_created", actor: staff.authUserId, target: inv && inv.id, bindlyClientId: checked.data.client, event: event });
+    await audit.log({ action: checked.data.attach ? "invite_created_attach" : "invite_created", actor: staff.authUserId, target: inv && inv.id, bindlyClientId: checked.data.client, event: event });
     return respond.json(201, { ok: true, user: inviteToRow(inv) });
   } catch (e) {
     return respond.json(e.status || 500, { error: e.message });
