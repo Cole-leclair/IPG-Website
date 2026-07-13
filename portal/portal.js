@@ -1139,9 +1139,10 @@
         });
     });
 
-    // Two entry points, one modal: a discreet link on Clients (reachable by
-    // Staff, who never see the Team tab) and a plain button on Team (where
-    // Admins manage this front and center).
+    // Three entry points, one modal: a discreet link on Clients (reachable by
+    // Staff, who never see the Team tab), a plain button on Team (where
+    // Admins manage this front and center), and the header name itself when
+    // it's in staff/admin mode.
     function openModal() {
       msg.className = "portal-msg"; msg.textContent = "";
       loadMyProfile();
@@ -1154,6 +1155,14 @@
     if (clientsLink) clientsLink.addEventListener("click", function (e) { e.preventDefault(); openModal(); });
     var teamBtn = $("myContactLinkTeam");
     if (teamBtn) teamBtn.addEventListener("click", openModal);
+    var pUserBtn = $("pUser");
+    if (pUserBtn) {
+      pUserBtn.addEventListener("click", function () {
+        // Clients see the same element as a plain name display — only staff/
+        // admin mode (showAdmin swaps in the .btn classes) opens the modal.
+        if (pUserBtn.classList.contains("btn")) openModal();
+      });
+    }
     modal.addEventListener("click", function (e) {
       if (e.target && e.target.closest && e.target.closest("[data-close-profile]")) closeModal();
     });
@@ -1517,7 +1526,14 @@
     setChrome("admin");
     // The Team tab exists only for admins; staff never see it.
     var teamTab = $("teamTab"); if (teamTab) teamTab.hidden = !adminIsAdmin;
-    $("pUser").textContent = (user && user.name) || "IPG Admin";
+    var pUserAdmin = $("pUser");
+    if (pUserAdmin) {
+      pUserAdmin.textContent = (user && user.name) || "IPG Admin";
+      // In staff/admin mode this doubles as the "My contact info" trigger —
+      // look like a real button, matching Sign out next to it.
+      pUserAdmin.classList.remove("plain-btn");
+      pUserAdmin.classList.add("btn", "btn-outline", "btn-sm");
+    }
     $("pWelcome").textContent = "Admin";
     $("pCompany").textContent = adminIsAdmin
       ? "Create and manage client logins and team members."
@@ -1538,7 +1554,14 @@
     siteHeader(false);
 
     // Header + greeting adapt to the client type.
-    $("pUser").textContent = (client && (client.company || client.name)) || "Client";
+    var pUserClient = $("pUser");
+    if (pUserClient) {
+      pUserClient.textContent = (client && (client.company || client.name)) || "Client";
+      // Clients never get the "My contact info" trigger — reset back to a
+      // plain name display in case this browser was just an admin/staff login.
+      pUserClient.classList.remove("btn", "btn-outline", "btn-sm");
+      pUserClient.classList.add("plain-btn");
+    }
     $("pWelcome").textContent = "Welcome, " + ((client && client.name) || "Client") + ".";
     $("pCompany").textContent = commercial && client.company ? client.company : "";
 

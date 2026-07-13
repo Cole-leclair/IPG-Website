@@ -84,6 +84,11 @@
   .portal-header-left { display: flex; align-items: center; gap: 20px; }
   .portal-header .logo-img { height: 50px; }
   .portal-user { display: flex; align-items: center; gap: 14px; font-size: 14px; font-weight: 600; color: var(--ink); }
+  /* #pUser doubles as a name display (clients) and a "My contact info"
+     trigger (staff/admin) — .plain-btn resets it back to looking like plain
+     text; portal.js swaps this for real .btn classes only in staff mode. */
+  #pUser { cursor: default; }
+  #pUser.plain-btn { background: none; border: 0; padding: 0; font: inherit; font-weight: inherit; color: inherit; }
   .btn-sm { padding: 8px 16px; font-size: 13px; }
   .portal-tabs { display: flex; gap: 2px; padding: 0 20px; background: var(--white); border-bottom: 1px solid var(--line); overflow-x: auto; }
   .ptab { padding: 15px 18px; background: none; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; font: inherit; font-weight: 600; font-size: 14px; color: var(--slate); cursor: pointer; white-space: nowrap; }
@@ -349,7 +354,7 @@
     <div class="portal-header-left">
       <a class="brand" href="/" title="Back to ipg.team"><img class="logo-img" src="../assets/logo.png" alt="IPG"></a>
     </div>
-    <div class="portal-user"><span id="pUser">Client</span><button id="signOut" class="btn btn-outline btn-sm" type="button">Sign out</button></div>
+    <div class="portal-user"><button id="pUser" class="plain-btn" type="button">Client</button><button id="signOut" class="btn btn-outline btn-sm" type="button">Sign out</button></div>
   </header>
 
   <nav class="portal-tabs" id="portalTabs" role="tablist" aria-label="Portal sections">
@@ -654,6 +659,6 @@
   </main>
 </div>
 
-<script src="portal.js?v=41"></script>
+<script src="portal.js?v=42"></script>
 </body>
 </html>
