@@ -310,12 +310,36 @@
   // headings render uppercase, so "COIs" would read as the typo-ish "COIS").
   var DOC_CATEGORY_LABELS = { "COIs": "Certificates", "Cert Holders": "Issued Certificates", "Dec Pages": "Declarations" };
   function docCategoryLabel(cat) { return DOC_CATEGORY_LABELS[cat] || cat; }
+  // Within a type group, newest year first. `year` comes from the backend
+  // (derived from Bindly's `modified` date — the closest proxy available
+  // until Bindly can expose a real policy-term year; see portal-documents.js).
+  // Anything without a parseable date lands in "Undated" at the end rather
+  // than being dropped or mixed in with real years.
+  function renderYearGroups(items) {
+    var byYear = {};
+    items.forEach(function (d) {
+      var y = d.year || "Undated";
+      (byYear[y] = byYear[y] || []).push(d);
+    });
+    var years = Object.keys(byYear).sort(function (a, b) {
+      if (a === "Undated") return 1;
+      if (b === "Undated") return -1;
+      return Number(b) - Number(a);
+    });
+    return years.map(function (y) {
+      return '<div class="doc-year-group">' +
+        '<div class="doc-year-head">' + esc(y) + '</div>' +
+        '<ul class="doc-list">' + byYear[y].map(docItem).join("") + '</ul>' +
+      '</div>';
+    }).join("");
+  }
   function renderDocGroups(filter) {
     var wrap = $("docGroups");
     if (!wrap) return;
     var q = (filter || "").trim().toLowerCase();
     var docs = state.documents.filter(function (d) {
-      return !q || (cleanDocName(d.name) + " " + (d.name || "") + " " + (d.kind || "") + " " + docCategoryLabel(d.kind || "")).toLowerCase().indexOf(q) > -1;
+      return !q || (cleanDocName(d.name) + " " + (d.name || "") + " " + (d.kind || "") + " " +
+        docCategoryLabel(d.kind || "") + " " + (d.year || "")).toLowerCase().indexOf(q) > -1;
     });
     if (!docs.length) {
       wrap.innerHTML = '<ul class="doc-list"><li class="doc-empty">' +
@@ -337,7 +361,7 @@
       return '<div class="doc-group">' +
         '<div class="doc-group-head"><span class="lbl">' + esc(docCategoryLabel(cat)) + '</span>' +
           '<span class="cnt">' + groups[cat].length + '</span></div>' +
-        '<ul class="doc-list">' + groups[cat].map(docItem).join("") + '</ul>' +
+        renderYearGroups(groups[cat]) +
       '</div>';
     }).join("");
   }
@@ -2110,12 +2134,12 @@
           status: "expired", renewsSoon: false, daysToRenew: -120, coverages: [] }
       ];
       state.documents = [
-        { name: "Acosta Drilling_GL Binder.pdf", kind: "Policies", date: "May 30, 2025", url: "#" },
-        { name: "Workers Comp Policy 2026.pdf", kind: "Policies", date: "Jan 2, 2026", url: "#" },
-        { name: "Auto ID Card.pdf", kind: "ID Cards", date: "Mar 3, 2024", url: "#" },
-        { name: "GL Dec Page.pdf", kind: "Declarations", date: "May 30, 2025", url: "#" },
-        { name: "2025 Loss Runs.pdf", kind: "Loss Runs", date: "Jun 1, 2026", url: "#" }
-      ].concat(commercial ? [{ name: "Acosta Drilling Inc - Master COI.pdf", kind: "COIs", date: "Jun 15, 2026", url: "#" }] : []);
+        { name: "Acosta Drilling_GL Binder.pdf", kind: "Policies", date: "May 30, 2025", year: 2025, url: "#" },
+        { name: "Workers Comp Policy 2026.pdf", kind: "Policies", date: "Jan 2, 2026", year: 2026, url: "#" },
+        { name: "Auto ID Card.pdf", kind: "ID Cards", date: "Mar 3, 2024", year: 2024, url: "#" },
+        { name: "GL Dec Page.pdf", kind: "Declarations", date: "May 30, 2025", year: 2025, url: "#" },
+        { name: "2025 Loss Runs.pdf", kind: "Loss Runs", date: "Jun 1, 2026", year: 2026, url: "#" }
+      ].concat(commercial ? [{ name: "Acosta Drilling Inc - Master COI.pdf", kind: "COIs", date: "Jun 15, 2026", year: 2026, url: "#" }] : []);
       state.holders = commercial ? [
         { id: "c1", name: "City of Dallas", address: "1500 Marilla St, Dallas, TX 75201", status: "issued", date: "Jul 1, 2026", url: "#" }
       ] : [];
