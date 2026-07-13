@@ -194,7 +194,11 @@
   .form-field.full { grid-column: 1 / -1; }
   .lbl-hint { font-weight: 400; color: var(--slate); font-size: 12px; }
   /* ---- Admin: invite form + confirm ---- */
-  #inviteForm select, #teamInviteForm select, .invite-confirm select { width: 100%; padding: 11px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--white); font: inherit; color: var(--ink); }
+  #inviteForm select, #teamInviteForm select { width: 100%; padding: 11px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--white); font: inherit; color: var(--ink); }
+  /* The confirm-screen's Account type field sits among plain-text summary
+     rows (Email, Name, Bindly Client) — a full-width form-style select there
+     reads as oversized next to them, so this one stays compact and inline. */
+  .invite-confirm select { width: auto; min-width: 150px; padding: 6px 30px 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--white); font: inherit; font-size: 14px; color: var(--ink); }
   /* Inputs inside the invite confirm grid (person name/email on attach mode) */
   .invite-confirm .acct-item input { width: 100%; padding: 9px 11px; border: 1px solid var(--line); border-radius: 9px; background: var(--white); font: inherit; font-size: 14px; color: var(--ink); }
   .invite-confirm .acct-item input:focus { outline: none; border-color: var(--ipg-blue); }
@@ -496,6 +500,23 @@
 
     <!-- ADMIN (staff/admin only — hidden for clients) -->
     <div class="ptab-panel" data-panel="admin" hidden>
+      <!-- Self-service: whatever phone/email shows on a client's Producer/CSR
+           card when Bindly names this staff member in that role. Kept at the
+           top so it's not buried below the invite form and client list. -->
+      <div class="portal-panel">
+        <h2>My contact info</h2>
+        <p class="portal-note" style="margin:0 0 16px;">If Bindly names you as a client's Producer or CSR, this is the phone and email shown on their Account tab.</p>
+        <form id="myProfileForm" novalidate>
+          <div class="form-grid">
+            <div class="form-field"><label>Name</label><input type="text" id="mpName" disabled></div>
+            <div class="form-field"><label for="mpPhone">Phone</label><input id="mpPhone" type="tel" maxlength="40"></div>
+            <div class="form-field full"><label for="mpEmail">Email <span class="lbl-hint">(optional override)</span></label><input id="mpEmail" type="email" maxlength="254"></div>
+          </div>
+          <button class="btn btn-primary btn-sm" type="submit">Save</button>
+          <p class="portal-msg" id="myProfileMsg" aria-live="polite"></p>
+        </form>
+      </div>
+
       <div class="portal-panel">
         <h2>Add a client login</h2>
         <p class="portal-note" id="inviteFormNote" style="margin:0 0 16px;">Create a portal login for a client. They&rsquo;ll get an email to set their own password &mdash; nothing to hand over. Enter their email and we&rsquo;ll look them up in Bindly automatically.</p>
@@ -537,22 +558,6 @@
       <div class="portal-panel">
         <div class="panel-head"><h2>Client logins</h2><button class="btn btn-outline btn-sm" type="button" id="usersRefresh">Refresh</button></div>
         <ul class="doc-list" id="userList"></ul>
-      </div>
-
-      <!-- Self-service: whatever phone/email shows on a client's Producer/CSR
-           card when Bindly names this staff member in that role. -->
-      <div class="portal-panel">
-        <h2>My contact info</h2>
-        <p class="portal-note" style="margin:0 0 16px;">If Bindly names you as a client's Producer or CSR, this is the phone and email shown on their Account tab.</p>
-        <form id="myProfileForm" novalidate>
-          <div class="form-grid">
-            <div class="form-field"><label>Name</label><input type="text" id="mpName" disabled></div>
-            <div class="form-field"><label for="mpPhone">Phone</label><input id="mpPhone" type="tel" maxlength="40"></div>
-            <div class="form-field full"><label for="mpEmail">Email <span class="lbl-hint">(optional override)</span></label><input id="mpEmail" type="email" maxlength="254"></div>
-          </div>
-          <button class="btn btn-primary btn-sm" type="submit">Save</button>
-          <p class="portal-msg" id="myProfileMsg" aria-live="polite"></p>
-        </form>
       </div>
 
     </div>
