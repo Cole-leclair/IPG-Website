@@ -1163,10 +1163,9 @@
         });
     });
 
-    // Two entry points, one modal: a plain button on Team (where Admins
-    // manage this front and center) and the header name itself when it's in
-    // staff/admin mode — reachable by Staff too, since the header is shared
-    // across every tab (they never see the Team tab on its own).
+    // Single entry point: the header name itself, in staff/admin mode. Shared
+    // across every tab, so Staff can reach it too even though they never see
+    // the Team tab directly.
     function openModal() {
       msg.className = "portal-msg"; msg.textContent = "";
       loadMyProfile();
@@ -1175,8 +1174,6 @@
     }
     function closeModal() { modal.hidden = true; }
 
-    var teamBtn = $("myContactLinkTeam");
-    if (teamBtn) teamBtn.addEventListener("click", openModal);
     var pUserBtn = $("pUser");
     if (pUserBtn) {
       pUserBtn.addEventListener("click", function () {
