@@ -1040,24 +1040,23 @@
       '" data-add-login-name="' + esc(u.name || "") + '">+ Add login</a>';
   }
 
-  // One list-row for either a client login or a team member. showAddLogin is
-  // only true for a SOLO client row (not a member inside a shell — the shell
-  // header carries its own single add-login action instead).
-  function rowHtml(u, isTeam, showAddLogin) {
+  // One list-row for either a client login or a team member. Client rows only
+  // ever appear inside a client-shell now (see shellHtml) — the shell header
+  // carries the single "+ Add login" action for the whole account.
+  function rowHtml(u, isTeam) {
     var bits = isTeam
       ? [ u.name ? u.email : "", cap(u.role), fmtDate(u.created) ].filter(Boolean)
       : [ u.name ? u.email : "", cap(u.account_type), fmtDate(u.created) ].filter(Boolean);
-    var extra = (!isTeam && showAddLogin) ? addLoginLink(u) : "";
     var actions;
     if (u.status === "invited") {
-      actions = '<span class="contact-actions">' + extra +
+      actions = '<span class="contact-actions">' +
         '<a href="#" class="doc-dl" data-resend="' + esc(u.id) + '">Resend</a>' +
         '<a href="#" class="doc-dl doc-dl-danger" data-revoke="' + esc(u.id) + '">Revoke</a>' +
       '</span>';
     } else if (u.id === adminSelfId) {
       actions = '<span class="you-tag">You</span>'; // can't remove your own login
     } else {
-      actions = '<span class="contact-actions">' + extra +
+      actions = '<span class="contact-actions">' +
         '<a href="#" class="doc-dl doc-dl-danger" data-remove-user="' + esc(u.id) + '">Remove</a>' +
       '</span>';
     }
@@ -1088,16 +1087,40 @@
     return group.slice().sort(function (a, b) { return new Date(a.created) - new Date(b.created); })[0];
   }
 
+  // Every client — solo or multi-login — renders as a collapsed-by-default
+  // shell: the client/company name is the main thing shown, and a caret
+  // toggle reveals the individual login(s) underneath (see initClientShells).
   function shellHtml(group) {
     var primary = shellPrimary(group);
-    var bits = [cap(primary.account_type), group.length + " logins", "Bindly " + (primary.bindly_client_id || "—")];
+    var n = group.length;
+    var bits = [cap(primary.account_type), n + (n === 1 ? " login" : " logins"), "Bindly " + (primary.bindly_client_id || "—")];
     return '<li class="client-shell">' +
-      '<div class="client-shell-head"><span class="doc-ico">' + PERSON_ICON + '</span>' +
-        '<span class="doc-meta"><span class="n">' + esc(primary.name || primary.email || "Client") + '</span>' +
-        '<span class="m">' + esc(bits.join(" · ")) + '</span></span>' +
-        '<span class="contact-actions">' + addLoginLink(primary) + '</span></div>' +
-      '<ul class="client-shell-list">' + group.map(function (u) { return rowHtml(u, false); }).join("") + '</ul>' +
+      '<div class="client-shell-head">' +
+        '<button class="client-shell-toggle" type="button" aria-expanded="false">' +
+          '<span class="doc-ico">' + PERSON_ICON + '</span>' +
+          '<span class="doc-meta"><span class="n">' + esc(primary.name || primary.email || "Client") + '</span>' +
+          '<span class="m">' + esc(bits.join(" · ")) + '</span></span>' +
+          '<span class="client-shell-caret">' + CARET_ICON + '</span>' +
+        '</button>' +
+        '<span class="contact-actions">' + addLoginLink(primary) + '</span>' +
+      '</div>' +
+      '<ul class="client-shell-list" hidden>' + group.map(function (u) { return rowHtml(u, false); }).join("") + '</ul>' +
     '</li>';
+  }
+
+  // Expand/collapse a client shell (event-delegated so it survives re-renders).
+  function initClientShells() {
+    var list = $("userList");
+    if (!list) return;
+    list.addEventListener("click", function (e) {
+      var btn = e.target && e.target.closest ? e.target.closest(".client-shell-toggle") : null;
+      if (!btn) return;
+      var shell = btn.closest(".client-shell");
+      var body = shell && shell.querySelector(".client-shell-list");
+      var open = shell.classList.toggle("open");
+      btn.setAttribute("aria-expanded", open ? "true" : "false");
+      if (body) body.hidden = !open;
+    });
   }
 
   var clientSearchQuery = "";
@@ -1120,7 +1143,7 @@
         '</li>';
       return;
     }
-    el.innerHTML = groups.map(function (g) { return g.length > 1 ? shellHtml(g) : rowHtml(g[0], false, true); }).join("");
+    el.innerHTML = groups.map(function (g) { return shellHtml(g); }).join("");
   }
 
   function initClientSearch() {
@@ -2145,6 +2168,7 @@
   initTeamInviteForm();
   initUserActions();
   initClientSearch();
+  initClientShells();
   initPlaceholderDownloads();
   initFreshDownloads();
   init2faExtras();
