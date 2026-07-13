@@ -5,7 +5,7 @@ var auth = require("./utils/auth");
 var bindly = require("./utils/bindly");
 var respond = require("./utils/respond");
 var ratelimit = require("./utils/ratelimit");
-var STAFF_DIRECTORY = require("./utils/staff-directory");
+var staffDirectory = require("./utils/staff-directory");
 
 // Bindly's confirmed shape (per their dev, 2026-07-12) on GET /clients/{id}:
 // `producer` and `csr` are each either an object { name, email } (name is
@@ -15,11 +15,12 @@ var STAFF_DIRECTORY = require("./utils/staff-directory");
 // shape for clients with secondary CSRs, often empty.
 //
 // Bindly doesn't store staff phone numbers at all, so phone always comes
-// from IPG's own staff directory, keyed by the resolved name. The directory
-// is also the fallback for email if Bindly's copy is blank.
-function resolvePerson(p) {
+// from IPG's own staff directory (self-service editable — see
+// portal-staff-profile.js), keyed by the resolved name. The directory is
+// also the fallback for email if Bindly's copy is blank.
+async function resolvePerson(p) {
   if (!p || !p.name) return null;
-  var staff = STAFF_DIRECTORY[p.name.trim().toLowerCase()];
+  var staff = await staffDirectory.lookup(p.name);
   return {
     name: p.name,
     email: p.email || (staff && staff.email) || "",
@@ -55,6 +56,8 @@ exports.handler = async function (event) {
     var c = (data && data.client) || data || {};
     // Prefer the mailing address for the "Mailing address" row.
     var addr = fmtAddress(c.mailing_address || c.mailingAddress || c.address || c.operating_address);
+    var producer = await resolvePerson(c.producer);
+    var csrs = (await Promise.all([c.csr].concat(c.additional_csrs || []).map(resolvePerson))).filter(Boolean);
     return respond.json(200, {
       // accountType comes from the VERIFIED Clerk token, never from Bindly's
       // response — it's what authorization is based on. Bindly's `type` is
@@ -66,8 +69,8 @@ exports.handler = async function (event) {
         email: c.email || "",
         phone: c.phone || "",
         address: addr,
-        producer: resolvePerson(c.producer),
-        csrs: [c.csr].concat(c.additional_csrs || []).map(resolvePerson).filter(Boolean)
+        producer: producer,
+        csrs: csrs
       }
     });
   } catch (e) {

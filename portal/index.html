@@ -519,6 +519,22 @@
         <ul class="doc-list" id="userList"></ul>
       </div>
 
+      <!-- Self-service: whatever phone/email shows on a client's Producer/CSR
+           card when Bindly names this staff member in that role. -->
+      <div class="portal-panel">
+        <h2>My contact info</h2>
+        <p class="portal-note" style="margin:0 0 16px;">If Bindly names you as a client's Producer or CSR, this is the phone and email shown on their Account tab.</p>
+        <form id="myProfileForm" novalidate>
+          <div class="form-grid">
+            <div class="form-field"><label>Name</label><input type="text" id="mpName" disabled></div>
+            <div class="form-field"><label for="mpPhone">Phone</label><input id="mpPhone" type="tel" maxlength="40"></div>
+            <div class="form-field full"><label for="mpEmail">Email <span class="lbl-hint">(optional override)</span></label><input id="mpEmail" type="email" maxlength="254"></div>
+          </div>
+          <button class="btn btn-primary btn-sm" type="submit">Save</button>
+          <p class="portal-msg" id="myProfileMsg" aria-live="polite"></p>
+        </form>
+      </div>
+
     </div>
 
     <!-- TEAM (admins only — its own tab, kept off the main Clients page). Adding
@@ -566,6 +582,6 @@
   </main>
 </div>
 
-<script src="portal.js?v=35"></script>
+<script src="portal.js?v=36"></script>
 </body>
 </html>

@@ -87,6 +87,23 @@ create table if not exists portal_contacts (
 create index if not exists portal_contacts_client_idx on portal_contacts (bindly_client_id);
 
 -- ---------------------------------------------------------------------
+-- staff_directory — phone/email for whoever Bindly names as a client's
+-- Producer or CSR (netlify/functions/portal-me.js). Self-service: each
+-- staff/admin login updates their own row via portal-staff-profile.js.
+-- Keyed by the lowercased display name (name_key) since that's the only
+-- thing Bindly's producer/csr fields give us to join on — there's no
+-- Bindly-side staff id to link against a Clerk user id.
+-- ---------------------------------------------------------------------
+create table if not exists staff_directory (
+  name_key          text primary key,                  -- lower(trim(name)), e.g. "cole leclair"
+  name              text not null,                      -- display name as Bindly resolves it
+  phone             text,
+  email             text,
+  updated_by        text,                                -- Clerk user id of whoever last saved it
+  updated_at        timestamptz not null default now()
+);
+
+-- ---------------------------------------------------------------------
 -- audit_log — compliance trail (GLBA Safeguards). Who viewed/downloaded
 -- what. utils/audit.js writes here once wired; logs to Netlify function
 -- logs until then.

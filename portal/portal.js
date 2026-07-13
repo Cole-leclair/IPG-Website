@@ -208,6 +208,14 @@
     // Permanently remove an ACTIVE login (deletes the Clerk user).
     remove: function (row) {
       return authedApi("/portal-admin-users", { method: "POST", body: { action: "delete", id: row.id } });
+    },
+    // Self-service: the phone/email shown on a client's Producer/CSR card
+    // when Bindly names the caller in that role.
+    getMyProfile: function () {
+      return authedApi("/portal-staff-profile");
+    },
+    updateMyProfile: function (data) {
+      return authedApi("/portal-staff-profile", { method: "PUT", body: data });
     }
   };
 
@@ -936,6 +944,40 @@
     });
   }
 
+  // Pre-fills "My contact info" with whatever's already on file (or blank —
+  // there may be no row yet). A load failure just leaves the form blank
+  // rather than blocking the rest of the admin tab.
+  function loadMyProfile() {
+    AdminData.getMyProfile().then(function (p) {
+      $("mpName").value = p.name || "";
+      $("mpPhone").value = p.phone || "";
+      $("mpEmail").value = p.email || "";
+    }).catch(function () { /* leave the form blank; saving still works */ });
+  }
+
+  function initMyProfileForm() {
+    var form = $("myProfileForm");
+    if (!form) return;
+    var msg = $("myProfileMsg");
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      msg.className = "portal-msg";
+      msg.textContent = "";
+      var btn = form.querySelector('button[type="submit"]');
+      if (btn) { btn.disabled = true; btn.textContent = "Saving…"; }
+      AdminData.updateMyProfile({ phone: $("mpPhone").value.trim(), email: $("mpEmail").value.trim() })
+        .then(function () {
+          msg.className = "portal-msg ok";
+          msg.textContent = "Saved.";
+        }).catch(function (err) {
+          msg.className = "portal-msg err";
+          msg.textContent = (err && err.message) || "Couldn’t save — please try again.";
+        }).finally(function () {
+          if (btn) { btn.disabled = false; btn.textContent = "Save"; }
+        });
+    });
+  }
+
   function initInviteForm() {
     var form = $("inviteForm");
     if (!form) return;
@@ -1181,6 +1223,7 @@
       : "Create and manage client logins.";
     activateTab("admin");
     loadUsers();
+    loadMyProfile();
     window.scrollTo(0, 0);
   }
 
@@ -1524,6 +1567,7 @@
   initServiceForm();
   initContactForm();
   initInviteForm();
+  initMyProfileForm();
   initTeamInviteForm();
   initUserActions();
   initPlaceholderDownloads();
