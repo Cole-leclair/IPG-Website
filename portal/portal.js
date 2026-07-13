@@ -1163,10 +1163,10 @@
         });
     });
 
-    // Three entry points, one modal: a discreet link on Clients (reachable by
-    // Staff, who never see the Team tab), a plain button on Team (where
-    // Admins manage this front and center), and the header name itself when
-    // it's in staff/admin mode.
+    // Two entry points, one modal: a plain button on Team (where Admins
+    // manage this front and center) and the header name itself when it's in
+    // staff/admin mode — reachable by Staff too, since the header is shared
+    // across every tab (they never see the Team tab on its own).
     function openModal() {
       msg.className = "portal-msg"; msg.textContent = "";
       loadMyProfile();
@@ -1175,8 +1175,6 @@
     }
     function closeModal() { modal.hidden = true; }
 
-    var clientsLink = $("myContactLinkClients");
-    if (clientsLink) clientsLink.addEventListener("click", function (e) { e.preventDefault(); openModal(); });
     var teamBtn = $("myContactLinkTeam");
     if (teamBtn) teamBtn.addEventListener("click", openModal);
     var pUserBtn = $("pUser");
