@@ -113,7 +113,10 @@
     addHolder: function (data) {
       return authedApi("/portal-cert-holders", { method: "POST", body: data });
     },
-    // GET profile -> { name, company, email, phone, address }.
+    // GET profile -> { name, company, email, phone, address, masterCoi }.
+    // masterCoi (or null) is Bindly's approval record for the master
+    // certificate — the single source of truth for that document, entirely
+    // separate from the /portal-documents listing.
     getAccount: function () {
       return authedApi("/portal-me").then(function (b) { return b.client || {}; });
     },
@@ -143,9 +146,10 @@
   // Local view state. Holders added in-session live here. docsLoadedAt tracks
   // when the document listing (with its 15-minute signed URLs) was fetched, so
   // download clicks know whether the links are still fresh.
-  var state = { policies: [], holders: [], commercial: false, contacts: [], documents: [], clerkName: "", clerkHasRealName: false, docsLoadedAt: 0 };
+  var state = { policies: [], holders: [], commercial: false, contacts: [], documents: [], masterCoi: null, clerkName: "", clerkHasRealName: false, docsLoadedAt: 0 };
   function clearClientState() {
     state.policies = []; state.holders = []; state.contacts = []; state.documents = [];
+    state.masterCoi = null;
     state.docsLoadedAt = 0;
   }
 
@@ -485,25 +489,27 @@
   }
 
   // Master COI card at the top of the Certificates tab — the client's overall
-  // certificate of insurance (as opposed to a holder-specific cert), filed by
-  // Bindly under the "COIs" document category. Hidden entirely if there's
-  // none on file. If more than one exists (e.g. renewed each year), shows the
-  // most recently modified one.
+  // certificate of insurance (as opposed to a holder-specific cert). Sourced
+  // ONLY from Bindly's master_coi approval record (via PortalData.getAccount,
+  // state.masterCoi) — deliberately NOT from the documents listing, which no
+  // longer carries it at all. Hidden entirely unless Bindly has approved one.
   function renderMasterCoi() {
     var card = $("masterCoiCard");
     if (!card) return;
-    var cois = state.documents.filter(function (d) { return d.kind === "COIs"; });
-    if (!cois.length) { card.hidden = true; return; }
-    cois.sort(function (a, b) { return new Date(b.date) - new Date(a.date); });
-    var doc = cois[0];
-    var meta = [doc.name, doc.date].filter(Boolean).join(" · ");
-    $("masterCoiMeta").textContent = meta;
+    var mc = state.masterCoi;
+    if (!mc || !mc.approved || !mc.url) { card.hidden = true; return; }
+    var bits = [];
+    if (mc.approvedBy) bits.push("Approved by " + mc.approvedBy);
+    if (mc.approvedAt) bits.push(fmtDate(mc.approvedAt));
+    $("masterCoiMeta").textContent = bits.join(" · ");
+    var staleBadge = $("masterCoiStale");
+    if (staleBadge) staleBadge.hidden = !mc.stale;
     var link = $("masterCoiLink");
-    link.href = doc.url || "#";
-    // Route through the same fresh-link handler as document rows; without a
-    // URL the placeholder handler explains instead of opening a blank tab.
-    if (doc.url) link.setAttribute("data-dl-doc", state.documents.indexOf(doc));
-    else { link.removeAttribute("data-dl-doc"); link.removeAttribute("target"); }
+    link.href = mc.url;
+    // Fresh-link handling is separate from the documents 15-min-URL refresh
+    // (master_coi isn't in state.documents) — see data-dl-master-coi below.
+    link.setAttribute("data-dl-master-coi", "1");
+    link.setAttribute("target", "_blank");
     card.hidden = false;
   }
 
@@ -737,22 +743,28 @@
   var FRESH_WINDOW_MS = 13 * 60 * 1000; // refresh with a ~2 min safety margin
   function initFreshDownloads() {
     document.addEventListener("click", function (e) {
-      var a = e.target && e.target.closest ? e.target.closest("a[data-dl-doc], a[data-dl-holder]") : null;
+      var a = e.target && e.target.closest ? e.target.closest("a[data-dl-doc], a[data-dl-holder], a[data-dl-master-coi]") : null;
       if (!a) return;
       var isDoc = a.hasAttribute("data-dl-doc");
+      var isMasterCoi = a.hasAttribute("data-dl-master-coi");
       // Links are still fresh — let the browser follow them normally.
       if (state.docsLoadedAt && (Date.now() - state.docsLoadedAt) < FRESH_WINDOW_MS) return;
       e.preventDefault();
       var win = window.open("", "_blank"); // must be synchronous with the click
-      var idx = Number(a.getAttribute(isDoc ? "data-dl-doc" : "data-dl-holder"));
-      var stale = isDoc ? state.documents[idx] : state.holders[idx];
-      var refresh = isDoc
+      var idx = isMasterCoi ? -1 : Number(a.getAttribute(isDoc ? "data-dl-doc" : "data-dl-holder"));
+      var stale = isMasterCoi ? state.masterCoi : (isDoc ? state.documents[idx] : state.holders[idx]);
+      var refresh = isMasterCoi
+        ? PortalData.getAccount().then(function (account) {
+            state.masterCoi = (account && account.masterCoi) || null;
+            renderMasterCoi();
+            return (state.masterCoi && state.masterCoi.url) || (stale && stale.url) || "";
+          })
+        : isDoc
         ? PortalData.getDocuments().then(function (docs) {
             state.documents = docs || [];
             state.docsLoadedAt = Date.now();
             var search = $("docSearch");
             renderDocGroups(search ? search.value : "");
-            renderMasterCoi();
             // Match the clicked row back up by name + category.
             var m = state.documents.filter(function (d) {
               return stale && d.name === stale.name && d.kind === stale.kind;
@@ -970,6 +982,7 @@
       state.documents = r[1] || [];
       state.holders = r[2] || [];
       state.contacts = r[4] || [];
+      state.masterCoi = (r[3] && r[3].masterCoi) || null;
       state.docsLoadedAt = Date.now();
       $("statDocs").textContent = state.documents.length;
       renderPolicies();
@@ -2134,7 +2147,12 @@
         { name: "Auto ID Card.pdf", kind: "ID Cards", date: "Mar 3, 2024", year: 2024, url: "#" },
         { name: "GL Dec Page.pdf", kind: "Declarations", date: "May 30, 2025", year: 2025, url: "#" },
         { name: "2025 Loss Runs.pdf", kind: "Loss Runs", date: "Jun 1, 2026", year: 2026, url: "#" }
-      ].concat(commercial ? [{ name: "Acosta Drilling Inc - Master COI.pdf", kind: "COIs", date: "Jun 15, 2026", year: 2026, url: "#" }] : []);
+      ];
+      // Master COI is its own source of truth (Bindly's master_coi approval
+      // record), not part of the documents listing — see renderMasterCoi().
+      state.masterCoi = commercial
+        ? { approved: true, stale: false, approvedBy: "Cole LeClair", approvedAt: "2026-06-15", url: "#" }
+        : null;
       state.holders = commercial ? [
         { id: "c1", name: "City of Dallas", address: "1500 Marilla St, Dallas, TX 75201", status: "issued", date: "Jul 1, 2026", url: "#" }
       ] : [];

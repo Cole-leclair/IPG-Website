@@ -41,6 +41,21 @@ function fmtAddress(a) {
   return [street, region].filter(Boolean).join(", ");
 }
 
+// The Master COI's approval record — Bindly's single source of truth for
+// which certificate is "the" master COI, separate from the general document
+// cabinet (which no longer lists it under the "COIs" category at all).
+// `url` is a signed link like any other Bindly doc URL (short-lived).
+function resolveMasterCoi(mc) {
+  if (!mc || !mc.approved || !mc.url) return null;
+  return {
+    approved: true,
+    stale: !!mc.stale,
+    approvedBy: mc.name || mc.by || "",
+    approvedAt: mc.at || "",
+    url: mc.url
+  };
+}
+
 exports.handler = async function (event) {
   if (event.httpMethod !== "GET") return respond.json(405, { error: "method not allowed" });
 
@@ -70,7 +85,8 @@ exports.handler = async function (event) {
         phone: c.phone || "",
         address: addr,
         producer: producer,
-        csrs: csrs
+        csrs: csrs,
+        masterCoi: resolveMasterCoi(c.master_coi)
       }
     });
   } catch (e) {
