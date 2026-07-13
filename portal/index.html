@@ -121,6 +121,13 @@
   .doc-dl:hover { text-decoration: underline; }
   .contact-actions { flex-shrink: 0; display: flex; gap: 14px; }
   .doc-dl-danger { color: #b23b3b; }
+  /* ---- Client shell: several logins on the same Bindly account grouped
+     under one card instead of N disconnected rows. Only used when a group
+     has more than one login — a lone client still renders as a plain row. */
+  .doc-list li.client-shell { display: block; padding: 0; overflow: hidden; background: var(--paper); }
+  .client-shell-head { display: flex; align-items: center; gap: 14px; padding: 14px 16px; background: var(--honey-soft, #F6ECD7); }
+  .client-shell-list { list-style: none; margin: 0; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+  .client-shell-list li { border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; background: var(--white); }
   .contact-form { margin-top: 18px; }
   .portal-note { font-size: 12.5px; color: var(--slate); margin: 14px 0 0; }
   .doc-empty { font-size: 14px; color: var(--slate); }
@@ -211,6 +218,9 @@
   .portal-modal { position: fixed; inset: 0; z-index: 200; display: flex; align-items: center; justify-content: center; padding: 20px; }
   .portal-modal-backdrop { position: absolute; inset: 0; background: rgba(20,28,38,0.45); }
   .portal-modal-card { position: relative; z-index: 1; width: 100%; max-width: 440px; background: var(--white); border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 16px 48px rgba(0,0,0,0.24); padding: 24px 26px; max-height: 90vh; overflow-y: auto; }
+  /* The client-invite flow has a form plus a 2-column confirm grid, so it
+     needs more room than the single-column team-invite popup. */
+  .client-modal-card { max-width: 600px; }
   .portal-modal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
   .portal-modal-head h3 { margin: 0; font-size: 17px; }
   .portal-modal-x { background: none; border: 0; font-size: 26px; line-height: 1; color: var(--slate); cursor: pointer; padding: 0 4px; }
@@ -518,46 +528,67 @@
       </div>
 
       <div class="portal-panel">
-        <h2>Add a client login</h2>
-        <p class="portal-note" id="inviteFormNote" style="margin:0 0 16px;">Create a portal login for a client. They&rsquo;ll get an email to set their own password &mdash; nothing to hand over. Enter their email and we&rsquo;ll look them up in Bindly automatically.</p>
-
-        <!-- Step 1: email (or, in "add a person" mode, a company search) -->
-        <form id="inviteForm" novalidate>
-          <div class="form-grid">
-            <div class="form-field"><label for="ivEmail" id="ivEmailLbl">Client email</label><input id="ivEmail" type="email" maxlength="254" autocomplete="off" required></div>
-            <div class="form-field" id="ivNameField"><label for="ivName">Name <span class="lbl-hint">(optional override)</span></label><input id="ivName" type="text" maxlength="120"></div>
-          </div>
-          <button class="btn btn-primary btn-sm" type="submit">Look up client</button>
-          <p class="portal-msg" id="inviteMsg" aria-live="polite"></p>
-        </form>
-        <p class="portal-note" style="margin-top:14px;">Need to give an employee or family member their own login on an existing account? <a href="#" id="inviteModeToggle">Add a person to an existing company</a></p>
-
-        <!-- Step 1b: Bindly found more than one match — pick one -->
-        <div id="inviteMatches" class="invite-confirm" hidden>
-          <h3 id="inviteMatchesTitle">Select the right client</h3>
-          <p class="portal-note" id="inviteMatchesNote" style="margin:0 0 14px;">Bindly found more than one match for this email.</p>
-          <ul class="doc-list" id="inviteMatchesList"></ul>
-          <div class="invite-confirm-actions">
-            <button class="btn btn-outline btn-sm" type="button" id="inviteMatchesBackBtn">Back</button>
-          </div>
+        <div class="panel-head">
+          <h2>Clients</h2>
+          <span class="panel-head-actions">
+            <button class="btn btn-outline btn-sm" type="button" id="usersRefresh">Refresh</button>
+            <button class="btn btn-primary btn-sm" type="button" id="clientAddBtn">+ Add</button>
+          </span>
         </div>
-
-        <!-- Step 2: confirm the client before the invite goes out -->
-        <div id="inviteConfirm" class="invite-confirm" hidden>
-          <h3 id="inviteConfirmTitle">Confirm this client</h3>
-          <div class="acct-grid" id="inviteConfirmBody"></div>
-          <p class="portal-note" id="inviteConfirmWarn" style="margin:14px 0 16px;">Double-check this is the right client &mdash; sending links this login to the Bindly record above.</p>
-          <div class="invite-confirm-actions">
-            <button class="btn btn-primary btn-sm" type="button" id="inviteSendBtn">Send invite</button>
-            <button class="btn btn-outline btn-sm" type="button" id="inviteBackBtn">Back</button>
-          </div>
-          <p class="portal-msg" id="inviteConfirmMsg" aria-live="polite"></p>
+        <div class="doc-search">
+          <svg class="doc-search-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+          <input id="clientSearch" type="search" placeholder="Search clients…" autocomplete="off" aria-label="Search clients">
         </div>
+        <ul class="doc-list" id="userList"></ul>
       </div>
 
-      <div class="portal-panel">
-        <div class="panel-head"><h2>Client logins</h2><button class="btn btn-outline btn-sm" type="button" id="usersRefresh">Refresh</button></div>
-        <ul class="doc-list" id="userList"></ul>
+      <!-- Add-client popup (opened by the "+ Add" button above) -->
+      <div class="portal-modal" id="clientModal" hidden>
+        <div class="portal-modal-backdrop" data-close-client></div>
+        <div class="portal-modal-card client-modal-card" role="dialog" aria-modal="true" aria-labelledby="clientModalTitle">
+          <div class="portal-modal-head">
+            <h3 id="clientModalTitle">Add a client login</h3>
+            <button class="portal-modal-x" type="button" data-close-client aria-label="Close">&times;</button>
+          </div>
+
+          <p class="portal-note" id="inviteFormNote" style="margin:0 0 16px;">Create a portal login for a client. They&rsquo;ll get an email to set their own password &mdash; nothing to hand over. Enter their email and we&rsquo;ll look them up in Bindly automatically.</p>
+
+          <!-- Step 1: email (or, in "add a person" mode, a company search) -->
+          <form id="inviteForm" novalidate>
+            <div class="form-grid">
+              <div class="form-field"><label for="ivEmail" id="ivEmailLbl">Client email</label><input id="ivEmail" type="email" maxlength="254" autocomplete="off" required></div>
+              <div class="form-field" id="ivNameField"><label for="ivName">Name <span class="lbl-hint">(optional override)</span></label><input id="ivName" type="text" maxlength="120"></div>
+            </div>
+            <div class="invite-confirm-actions" style="margin-top:8px;">
+              <button class="btn btn-primary btn-sm" type="submit">Look up client</button>
+              <button class="btn btn-outline btn-sm" type="button" data-close-client>Cancel</button>
+            </div>
+            <p class="portal-msg" id="inviteMsg" aria-live="polite"></p>
+          </form>
+          <p class="portal-note" style="margin-top:14px;">Need to give an employee or family member their own login on an existing account? <a href="#" id="inviteModeToggle">Add a person to an existing company</a></p>
+
+          <!-- Step 1b: Bindly found more than one match — pick one -->
+          <div id="inviteMatches" class="invite-confirm" hidden>
+            <h3 id="inviteMatchesTitle">Select the right client</h3>
+            <p class="portal-note" id="inviteMatchesNote" style="margin:0 0 14px;">Bindly found more than one match for this email.</p>
+            <ul class="doc-list" id="inviteMatchesList"></ul>
+            <div class="invite-confirm-actions">
+              <button class="btn btn-outline btn-sm" type="button" id="inviteMatchesBackBtn">Back</button>
+            </div>
+          </div>
+
+          <!-- Step 2: confirm the client before the invite goes out -->
+          <div id="inviteConfirm" class="invite-confirm" hidden>
+            <h3 id="inviteConfirmTitle">Confirm this client</h3>
+            <div class="acct-grid" id="inviteConfirmBody"></div>
+            <p class="portal-note" id="inviteConfirmWarn" style="margin:14px 0 16px;">Double-check this is the right client &mdash; sending links this login to the Bindly record above.</p>
+            <div class="invite-confirm-actions">
+              <button class="btn btn-primary btn-sm" type="button" id="inviteSendBtn">Send invite</button>
+              <button class="btn btn-outline btn-sm" type="button" id="inviteBackBtn">Back</button>
+            </div>
+            <p class="portal-msg" id="inviteConfirmMsg" aria-live="polite"></p>
+          </div>
+        </div>
       </div>
 
     </div>
@@ -607,6 +638,6 @@
   </main>
 </div>
 
-<script src="portal.js?v=39"></script>
+<script src="portal.js?v=40"></script>
 </body>
 </html>

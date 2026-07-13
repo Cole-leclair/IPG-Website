@@ -994,16 +994,11 @@
         || adminState.team.filter(function (x) { return x.id === id; })[0];
   }
 
-  // One list-row for either a client login or a team member. sharedCounts (for
-  // client rows) maps bindly_client_id -> number of logins on that account, so
-  // companies with several people show it at a glance.
-  function rowHtml(u, isTeam, sharedCounts) {
+  // One list-row for either a client login or a team member.
+  function rowHtml(u, isTeam) {
     var bits = isTeam
       ? [ u.name ? u.email : "", cap(u.role), fmtDate(u.created) ].filter(Boolean)
       : [ u.name ? u.email : "", cap(u.account_type), fmtDate(u.created) ].filter(Boolean);
-    if (!isTeam && sharedCounts && u.bindly_client_id && sharedCounts[u.bindly_client_id] > 1) {
-      bits.push(sharedCounts[u.bindly_client_id] + " logins on this account");
-    }
     var actions;
     if (u.status === "invited") {
       actions = '<span class="contact-actions">' +
@@ -1023,16 +1018,65 @@
       statusPill(u.status) + actions + '</li>';
   }
 
-  function renderUsers() {
+  // Groups logins sharing the same bindly_client_id — a company with several
+  // people (the "add a person to an existing company" flow) gets ONE shell
+  // instead of N disconnected rows. Order preserved by first appearance.
+  function groupUsers(users) {
+    var order = [], groups = {};
+    users.forEach(function (u) {
+      var key = u.bindly_client_id || ("solo:" + u.id);
+      if (!groups[key]) { groups[key] = []; order.push(key); }
+      groups[key].push(u);
+    });
+    return order.map(function (key) { return groups[key]; });
+  }
+
+  // The shell's display name: the earliest-created login in the group is
+  // almost always the original client invite (their own name if personal,
+  // or Bindly's company name if commercial) — a later-attached employee's
+  // own name would be a confusing header for the whole account.
+  function shellPrimary(group) {
+    return group.slice().sort(function (a, b) { return new Date(a.created) - new Date(b.created); })[0];
+  }
+
+  function shellHtml(group) {
+    var primary = shellPrimary(group);
+    var bits = [cap(primary.account_type), group.length + " logins", "Bindly " + (primary.bindly_client_id || "—")];
+    return '<li class="client-shell">' +
+      '<div class="client-shell-head"><span class="doc-ico">' + PERSON_ICON + '</span>' +
+        '<span class="doc-meta"><span class="n">' + esc(primary.name || primary.email || "Client") + '</span>' +
+        '<span class="m">' + esc(bits.join(" · ")) + '</span></span></div>' +
+      '<ul class="client-shell-list">' + group.map(function (u) { return rowHtml(u, false); }).join("") + '</ul>' +
+    '</li>';
+  }
+
+  var clientSearchQuery = "";
+  function renderUsers(filter) {
+    if (filter !== undefined) clientSearchQuery = filter;
     var el = $("userList");
     if (!el) return;
-    var counts = {};
-    adminState.users.forEach(function (u) {
-      if (u.bindly_client_id) counts[u.bindly_client_id] = (counts[u.bindly_client_id] || 0) + 1;
-    });
-    el.innerHTML = adminState.users.length
-      ? adminState.users.map(function (u) { return rowHtml(u, false, counts); }).join("")
-      : '<li class="doc-empty">No client logins yet.</li>';
+    var q = clientSearchQuery.trim().toLowerCase();
+    var groups = groupUsers(adminState.users);
+    if (q) {
+      groups = groups.filter(function (g) {
+        return g.some(function (u) {
+          return (u.name || "").toLowerCase().indexOf(q) > -1 || (u.email || "").toLowerCase().indexOf(q) > -1;
+        });
+      });
+    }
+    if (!groups.length) {
+      el.innerHTML = '<li class="doc-empty">' +
+        (adminState.users.length ? "No clients match “" + esc(clientSearchQuery) + "”." : "No client logins yet.") +
+        '</li>';
+      return;
+    }
+    el.innerHTML = groups.map(function (g) { return g.length > 1 ? shellHtml(g) : rowHtml(g[0], false); }).join("");
+  }
+
+  function initClientSearch() {
+    var input = $("clientSearch");
+    if (!input) return;
+    input.addEventListener("input", function () { renderUsers(input.value); });
   }
 
   function renderTeam() {
@@ -1097,7 +1141,8 @@
 
   function initInviteForm() {
     var form = $("inviteForm");
-    if (!form) return;
+    var modal = $("clientModal");
+    if (!form || !modal) return;
     var matchesBox = $("inviteMatches");
     var confirmBox = $("inviteConfirm");
     var nameOverride = ""; // what staff typed in the optional Name field, if anything
@@ -1133,6 +1178,17 @@
     function resetToForm() {
       matchesBox.hidden = true; confirmBox.hidden = true; form.hidden = false;
     }
+
+    function openModal() {
+      attachMode = false; pending = null; nameOverride = "";
+      form.reset();
+      resetToForm();
+      applyMode();
+      var msg = $("inviteMsg"); if (msg) { msg.className = "portal-msg"; msg.textContent = ""; }
+      modal.hidden = false;
+      var email = $("ivEmail"); if (email) email.focus();
+    }
+    function closeModal() { modal.hidden = true; }
 
     function renderConfirm(p) {
       var html = "";
@@ -1266,6 +1322,17 @@
     $("inviteMatchesBackBtn").addEventListener("click", resetToForm);
     $("inviteBackBtn").addEventListener("click", resetToForm);
 
+    var addBtn = $("clientAddBtn");
+    if (addBtn) addBtn.addEventListener("click", openModal);
+    // Close on the X, Cancel, or the dark backdrop.
+    modal.addEventListener("click", function (e) {
+      if (e.target && e.target.closest && e.target.closest("[data-close-client]")) closeModal();
+    });
+    // Close on Escape.
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && !modal.hidden) closeModal();
+    });
+
     $("inviteSendBtn").addEventListener("click", function () {
       if (!pending) return;
       var typeSel = $("ivConfirmType");
@@ -1288,10 +1355,10 @@
       var btn = $("inviteSendBtn"); btn.disabled = true;
       AdminData.invite(pending).then(function (res) {
         if (res && res.ok) {
-          resetToForm(); form.reset();
-          var msg = $("inviteMsg"); msg.className = "portal-msg ok";
-          msg.textContent = "Invite sent to " + pending.email + ". They’ll get an email to set their password.";
+          var sentEmail = pending.email;
           pending = null;
+          closeModal();
+          showToast("Invite sent to " + sentEmail + ". They’ll get an email to set their password.");
           loadUsers();
         } else {
           cmsg.className = "portal-msg err"; cmsg.textContent = "Couldn’t send the invite. Please try again.";
@@ -1965,6 +2032,7 @@
   initMyProfileForm();
   initTeamInviteForm();
   initUserActions();
+  initClientSearch();
   initPlaceholderDownloads();
   initFreshDownloads();
   init2faExtras();
