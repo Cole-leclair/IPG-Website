@@ -39,13 +39,8 @@
 <style>
   /* hidden must beat class display rules (.portal-auth is display:flex) */
   [hidden] { display: none !important; }
-  :root { --flag-h: 30px; }
-  /* The flag sits in normal page flow (not fixed), so however many lines it
-     wraps to on a narrow phone, it can never overlap the header below it —
-     the old fixed version assumed one line and covered the logo on mobile. */
-  .portal-flag { background: var(--honey, #C98A2B); color: #fff; text-align: center; font-size: 12.5px; font-weight: 600; padding: 6px 12px; letter-spacing: .02em; }
   /* ---- Login ---- */
-  .portal-auth { min-height: calc(100vh - var(--flag-h)); display: flex; align-items: center; justify-content: center; padding: 48px 20px; }
+  .portal-auth { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 48px 20px; }
   .portal-card { width: 100%; max-width: 420px; background: var(--white); border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow-card); padding: 40px 34px; text-align: center; }
   /* Boot spinner — shown while Clerk resolves whether a session already
      exists, so a signed-in client refreshing the page never sees the login
@@ -245,10 +240,6 @@
 </style>
 </head>
 <body>
-
-<!-- Early-access flag: real logins work, so this no longer claims the portal
-     is disconnected (clients DO see live data). Remove at broad launch. -->
-<div class="portal-flag">Welcome to the new IPG Client Portal — questions? Call (214) 377-1460</div>
 
 <!-- PUBLIC SITE HEADER — shown on the login / set-password screens so the portal
      reads as part of ipg.team, not a separate app. portal.js hides it once the
@@ -611,6 +602,6 @@
   </main>
 </div>
 
-<script src="portal.js?v=38"></script>
+<script src="portal.js?v=39"></script>
 </body>
 </html>

@@ -1551,9 +1551,12 @@
   var signOut = $("signOut");
   if (signOut) {
     signOut.addEventListener("click", function () {
-      // Real auth: Clerk ends the session; its listener re-renders the login.
+      // Real auth: Clerk ends the session; its listener re-renders the login
+      // in place. Without an explicit redirectUrl, Clerk falls back to the
+      // instance's configured Home URL (the main site root) instead of
+      // staying on /portal/ — so pin it here.
       if (CLERK_ENABLED && window.Clerk) {
-        window.Clerk.signOut();
+        window.Clerk.signOut({ redirectUrl: "/portal/" });
         return;
       }
       PortalData.logout().then(function () {
@@ -1690,7 +1693,14 @@
       // server-side off the verified Clerk JWT.
       var md = Clerk.user.publicMetadata || {};
       var email = Clerk.user.primaryEmailAddress && Clerk.user.primaryEmailAddress.emailAddress;
-      var realName = Clerk.user.fullName || Clerk.user.firstName || "";
+      // Clerk itself never collects a name through the invite/accept flow, so
+      // fullName/firstName are only ever set if the person edits their own
+      // Clerk profile later. The name staff typed at invite time (e.g. the
+      // "Person's name" field when adding an employee to an existing
+      // company) is what's actually on file for who this login is — it
+      // lives in publicMetadata.name (see metaFor/teamMeta in
+      // portal-admin-users.js) and should count as a real name too.
+      var realName = Clerk.user.fullName || Clerk.user.firstName || md.name || "";
       var name = realName || email || "Client";
       // Staff/admin go to the admin tab (they have no client dashboard).
       var role = (md.role === "staff" || md.role === "admin") ? md.role : "client";

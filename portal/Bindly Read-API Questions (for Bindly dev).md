@@ -80,3 +80,23 @@ while testing real client invites that look like bugs on Bindly's side rather th
     Bindly only sends a name (no direct phone/email), that's fine — we already maintain
     our own internal directory to fill in contact info by name — we just need the field
     to reliably carry the correct name as it appears in your dashboard.
+
+## Follow-up (2026-07-13) — a policy document isn't coming back from `/documents`
+
+14. **★ A file tagged "POLICY" never shows up via the read API.** Test client "Test
+    Commercial" (`client_id` `9fe15efa-bab9-45f9-8851-2077a807aa7a`) has a real GL policy
+    on file (Chubb, eff. 01/12/2026 – 01/12/2027, confirmed via `GET
+    /clients/{client_id}/policies`). We uploaded "GL Policy - Test Commercial -
+    Undated.pdf" to that client's file cabinet, filed under "03 - POLICIES" and tagged
+    **POLICY** in your dashboard. A full hour later, `GET
+    /clients/{client_id}/documents` still returns only that client's Master COI — the
+    policy PDF never appears (so this isn't the ~10-minute indexing delay from Q12).
+    Two questions: (1) Why doesn't this file come back from `/documents` — does a
+    document need something beyond the POLICY tag/folder placement (e.g. linked
+    explicitly to the policy record, a specific filename format since ours says
+    "Undated", or a separate "publish"/sync step) to be exposed via the read API? (2)
+    Separately — is there any per-document flag to mark a file **internal-only / not
+    shared with the client**? Your API doc describes `/documents` as returning "every
+    file, categorized," so today we have no way to keep a specific file out of the
+    portal short of not filing it under a tracked category at all — if a visibility
+    toggle exists (or could be added), that's what we'd want to build against.
