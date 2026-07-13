@@ -1031,21 +1031,33 @@
         || adminState.team.filter(function (x) { return x.id === id; })[0];
   }
 
-  // One list-row for either a client login or a team member.
-  function rowHtml(u, isTeam) {
+  // The "+ Add login" link that opens the invite modal already in attach
+  // mode for THIS specific client — skips the company search step entirely
+  // (see openAttachFor in initInviteForm). Client rows only, never team.
+  function addLoginLink(u) {
+    return '<a href="#" class="doc-dl" data-add-login="' + esc(u.bindly_client_id || "") +
+      '" data-add-login-type="' + esc(u.account_type || "personal") +
+      '" data-add-login-name="' + esc(u.name || "") + '">+ Add login</a>';
+  }
+
+  // One list-row for either a client login or a team member. showAddLogin is
+  // only true for a SOLO client row (not a member inside a shell — the shell
+  // header carries its own single add-login action instead).
+  function rowHtml(u, isTeam, showAddLogin) {
     var bits = isTeam
       ? [ u.name ? u.email : "", cap(u.role), fmtDate(u.created) ].filter(Boolean)
       : [ u.name ? u.email : "", cap(u.account_type), fmtDate(u.created) ].filter(Boolean);
+    var extra = (!isTeam && showAddLogin) ? addLoginLink(u) : "";
     var actions;
     if (u.status === "invited") {
-      actions = '<span class="contact-actions">' +
+      actions = '<span class="contact-actions">' + extra +
         '<a href="#" class="doc-dl" data-resend="' + esc(u.id) + '">Resend</a>' +
         '<a href="#" class="doc-dl doc-dl-danger" data-revoke="' + esc(u.id) + '">Revoke</a>' +
       '</span>';
     } else if (u.id === adminSelfId) {
       actions = '<span class="you-tag">You</span>'; // can't remove your own login
     } else {
-      actions = '<span class="contact-actions">' +
+      actions = '<span class="contact-actions">' + extra +
         '<a href="#" class="doc-dl doc-dl-danger" data-remove-user="' + esc(u.id) + '">Remove</a>' +
       '</span>';
     }
@@ -1082,7 +1094,8 @@
     return '<li class="client-shell">' +
       '<div class="client-shell-head"><span class="doc-ico">' + PERSON_ICON + '</span>' +
         '<span class="doc-meta"><span class="n">' + esc(primary.name || primary.email || "Client") + '</span>' +
-        '<span class="m">' + esc(bits.join(" · ")) + '</span></span></div>' +
+        '<span class="m">' + esc(bits.join(" · ")) + '</span></span>' +
+        '<span class="contact-actions">' + addLoginLink(primary) + '</span></div>' +
       '<ul class="client-shell-list">' + group.map(function (u) { return rowHtml(u, false); }).join("") + '</ul>' +
     '</li>';
   }
@@ -1107,7 +1120,7 @@
         '</li>';
       return;
     }
-    el.innerHTML = groups.map(function (g) { return g.length > 1 ? shellHtml(g) : rowHtml(g[0], false); }).join("");
+    el.innerHTML = groups.map(function (g) { return g.length > 1 ? shellHtml(g) : rowHtml(g[0], false, true); }).join("");
   }
 
   function initClientSearch() {
@@ -1254,6 +1267,19 @@
     }
     function closeModal() { modal.hidden = true; }
 
+    // Entry point for the "+ Add login" action on a client row/shell — the
+    // company is already known, so this skips the search step entirely and
+    // opens straight to "collect the new person's name + email".
+    function openAttachFor(clientId, accountType, companyName) {
+      if (!clientId) return;
+      attachMode = true; nameOverride = "";
+      form.reset();
+      applyMode();
+      var msg = $("inviteMsg"); if (msg) { msg.className = "portal-msg"; msg.textContent = ""; }
+      modal.hidden = false;
+      chooseMatch("", { client_id: clientId, type: accountType, name: companyName });
+    }
+
     function renderConfirm(p) {
       var html = "";
       if (p.attach) {
@@ -1385,6 +1411,14 @@
 
     $("inviteMatchesBackBtn").addEventListener("click", resetToForm);
     $("inviteBackBtn").addEventListener("click", resetToForm);
+
+    // "+ Add login" on a client row/shell (rendered in renderUsers/shellHtml).
+    document.addEventListener("click", function (e) {
+      var a = e.target && e.target.closest ? e.target.closest("[data-add-login]") : null;
+      if (!a) return;
+      e.preventDefault();
+      openAttachFor(a.getAttribute("data-add-login"), a.getAttribute("data-add-login-type"), a.getAttribute("data-add-login-name"));
+    });
 
     var addBtn = $("clientAddBtn");
     if (addBtn) addBtn.addEventListener("click", openModal);
