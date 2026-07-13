@@ -173,10 +173,10 @@
   .doc-group-head { display: flex; align-items: baseline; gap: 8px; margin: 0 0 10px; }
   .doc-group-head .lbl { font-size: 13px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; color: var(--ink); }
   .doc-group-head .cnt { font-size: 12px; color: var(--slate-soft); font-weight: 600; }
-  /* ---- Certificates: explainer ---- */
-  .cert-explainer { background: var(--honey-soft); border: 1px solid #ecdcbb; border-radius: 14px; padding: 18px 22px; margin-bottom: 22px; }
-  .cert-explainer h3 { margin: 0 0 6px; font-size: 15px; color: var(--ink); }
-  .cert-explainer p { margin: 0; font-size: 13.5px; line-height: 1.55; color: var(--slate); }
+  /* ---- Certificates: disclaimer ---- */
+  .cert-disclaimer { background: var(--honey-soft); border: 1px solid #ecdcbb; border-radius: 14px; padding: 18px 22px; margin-bottom: 22px; }
+  .cert-disclaimer h3 { margin: 0 0 6px; font-size: 15px; color: var(--ink); }
+  .cert-disclaimer p { margin: 0; font-size: 13.5px; line-height: 1.55; color: var(--slate); }
   /* ---- Account: assigned agent ---- */
   /* .agent-card can hold one row (Producer) or several (CSR + any additional
      CSRs) — the role label heads the card once, each person is its own row. */
@@ -400,10 +400,10 @@
         <a class="btn btn-outline btn-sm" id="masterCoiLink" href="#" target="_blank" rel="noopener">Preview</a>
       </div>
 
-      <!-- What the certificate shows -->
-      <div class="cert-explainer">
-        <h3>What your certificate shows</h3>
-        <p>Each certificate is a standard ACORD 25 built from your active coverage — the same limits your agent would put on it. You provide who needs proof of insurance (the “holder”); we fill in your coverage automatically. Certificates issue instantly and are also saved to your documents.</p>
+      <!-- Certificate disclaimer -->
+      <div class="cert-disclaimer">
+        <h3>Please review before sending</h3>
+        <p>Certificates you issue here are generated instantly from your coverage on file — please double-check the details before sending one to a third party. If any policy shown is no longer active, has been cancelled, or has changed, contact us immediately at (214) 377-1460 so we can help before you rely on it.</p>
       </div>
 
       <!-- Add a holder -->
@@ -611,6 +611,6 @@
   </main>
 </div>
 
-<script src="portal.js?v=37"></script>
+<script src="portal.js?v=38"></script>
 </body>
 </html>

@@ -143,7 +143,7 @@
   // Local view state. Holders added in-session live here. docsLoadedAt tracks
   // when the document listing (with its 15-minute signed URLs) was fetched, so
   // download clicks know whether the links are still fresh.
-  var state = { policies: [], holders: [], commercial: false, contacts: [], documents: [], clerkName: "", docsLoadedAt: 0 };
+  var state = { policies: [], holders: [], commercial: false, contacts: [], documents: [], clerkName: "", clerkHasRealName: false, docsLoadedAt: 0 };
   function clearClientState() {
     state.policies = []; state.holders = []; state.contacts = []; state.documents = [];
     state.docsLoadedAt = 0;
@@ -512,15 +512,18 @@
   // Corrects the header/greeting once the real Bindly profile loads —
   // showDashboard's initial paint only has the Clerk login name/email to go
   // on. Personal: use the client's real name. Commercial: the small header
-  // name is the business name, but the big "Welcome" greeting stays the
+  // name is the business name, and the big "Welcome" greeting prefers the
   // actual logged-in person's name (Bindly's name field is the business
-  // contact, which may not be who's signed in).
+  // contact, which may not be who's signed in) — but falls back to that
+  // Bindly contact name instead of a raw login email when Clerk has no
+  // name on file for this user.
   function updateHeaderName(account) {
     if (!account) return;
     var personal = account.name || state.clerkName;
+    var commercialWelcome = state.clerkHasRealName ? state.clerkName : (account.name || state.clerkName);
     var pUser = $("pUser"), pWelcome = $("pWelcome");
     if (pUser) pUser.textContent = state.commercial ? (account.company || personal) : personal;
-    if (pWelcome) pWelcome.textContent = "Welcome, " + (state.commercial ? state.clerkName : personal) + ".";
+    if (pWelcome) pWelcome.textContent = "Welcome, " + (state.commercial ? commercialWelcome : personal) + ".";
   }
 
   function renderAccount(a) {
@@ -1687,7 +1690,8 @@
       // server-side off the verified Clerk JWT.
       var md = Clerk.user.publicMetadata || {};
       var email = Clerk.user.primaryEmailAddress && Clerk.user.primaryEmailAddress.emailAddress;
-      var name = Clerk.user.fullName || Clerk.user.firstName || email || "Client";
+      var realName = Clerk.user.fullName || Clerk.user.firstName || "";
+      var name = realName || email || "Client";
       // Staff/admin go to the admin tab (they have no client dashboard).
       var role = (md.role === "staff" || md.role === "admin") ? md.role : "client";
       if (role !== "client") { showAdmin({ name: name, role: role, id: Clerk.user.id }); return; }
@@ -1696,8 +1700,11 @@
       // The logged-in person's own Clerk name/email — used as the greeting
       // for commercial accounts (whose Bindly "name" is the business contact,
       // not necessarily the person signed in) and as a fallback until the
-      // real Bindly profile loads.
+      // real Bindly profile loads. clerkHasRealName distinguishes an actual
+      // Clerk-set name from the raw-email fallback, so updateHeaderName can
+      // prefer Bindly's contact name over showing someone's email address.
       state.clerkName = name;
+      state.clerkHasRealName = !!realName;
       showDashboard({ name: name, company: md.company || "", type: type });
     } else {
       // Signed out — show the native login form (reset any code step), and
