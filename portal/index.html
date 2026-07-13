@@ -89,6 +89,10 @@
      text; portal.js swaps this for real .btn classes only in staff mode. */
   #pUser { cursor: default; }
   #pUser.plain-btn { background: none; border: 0; padding: 0; font: inherit; font-weight: inherit; color: inherit; }
+  /* Tinted IPG blue (instead of the default outline's gray/ink) so it stands
+     out a bit next to the plain Sign out button. */
+  #pUser.btn-outline { color: var(--ipg-blue); border-color: var(--ipg-blue); }
+  #pUser.btn-outline:hover { background: var(--ipg-blue); color: var(--white); }
   .btn-sm { padding: 8px 16px; font-size: 13px; }
   .portal-tabs { display: flex; gap: 2px; padding: 0 20px; background: var(--white); border-bottom: 1px solid var(--line); overflow-x: auto; }
   .ptab { padding: 15px 18px; background: none; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; font: inherit; font-weight: 600; font-size: 14px; color: var(--slate); cursor: pointer; white-space: nowrap; }
