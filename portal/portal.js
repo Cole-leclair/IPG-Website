@@ -1043,10 +1043,21 @@
   // One list-row for either a client login or a team member. Client rows only
   // ever appear inside a client-shell now (see shellHtml) — the shell header
   // carries the single "+ Add login" action for the whole account.
-  function rowHtml(u, isTeam) {
+  //
+  // companyName (client rows only): the shell header already shows the
+  // company name once. Commercial accounts invited before there was a
+  // separate "person's name" field (the classic invite flow's Name field is
+  // just an optional override) have their login's name stored as Bindly's
+  // company name — so without this, that row would repeat the company name
+  // as if it were the person's. When it's an exact duplicate, show the email
+  // as the primary identifier instead rather than repeating the company name.
+  function rowHtml(u, isTeam, companyName) {
+    var isCompanyNameDupe = !isTeam && u.account_type === "commercial" &&
+      companyName && u.name && u.name === companyName;
+    var displayName = isCompanyNameDupe ? "" : u.name;
     var bits = isTeam
       ? [ u.name ? u.email : "", cap(u.role), fmtDate(u.created) ].filter(Boolean)
-      : [ u.name ? u.email : "", cap(u.account_type), fmtDate(u.created) ].filter(Boolean);
+      : [ displayName ? u.email : "", cap(u.account_type), fmtDate(u.created) ].filter(Boolean);
     var actions;
     if (u.status === "invited") {
       actions = '<span class="contact-actions">' +
@@ -1061,7 +1072,7 @@
       '</span>';
     }
     return '<li><span class="doc-ico">' + PERSON_ICON + '</span>' +
-      '<span class="doc-meta"><span class="n">' + esc(u.name || u.email) + '</span>' +
+      '<span class="doc-meta"><span class="n">' + esc(displayName || u.email) + '</span>' +
       '<span class="m">' + esc(bits.join(" · ")) + '</span></span>' +
       statusPill(u.status) + actions + '</li>';
   }
@@ -1104,7 +1115,7 @@
         '</button>' +
         '<span class="contact-actions">' + addLoginLink(primary) + '</span>' +
       '</div>' +
-      '<ul class="client-shell-list" hidden>' + group.map(function (u) { return rowHtml(u, false); }).join("") + '</ul>' +
+      '<ul class="client-shell-list" hidden>' + group.map(function (u) { return rowHtml(u, false, primary.name); }).join("") + '</ul>' +
     '</li>';
   }
 
