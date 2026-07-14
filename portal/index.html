@@ -199,7 +199,12 @@
   /* ---- Account: assigned agent ---- */
   /* .agent-card can hold one row (Producer) or several (CSR + any additional
      CSRs) — the role label heads the card once, each person is its own row. */
-  .agent-card { display: flex; flex-direction: column; gap: 16px; background: linear-gradient(135deg, #f0f5fc, #ffffff); border: 1px solid #d9e4f4; border-radius: 16px; padding: 20px 24px; margin-bottom: 22px; box-shadow: var(--shadow-card); }
+  /* Side by side on desktop so Producer + CSR don't each eat a full stacked
+     row; .agent-grid-solo (added by JS when only one card has content) makes
+     that lone card span the full row instead of sitting in a half-empty grid. */
+  .agent-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 22px; }
+  .agent-grid.agent-grid-solo { grid-template-columns: 1fr; }
+  .agent-card { display: flex; flex-direction: column; gap: 16px; background: linear-gradient(135deg, #f0f5fc, #ffffff); border: 1px solid #d9e4f4; border-radius: 16px; padding: 20px 24px; margin-bottom: 0; box-shadow: var(--shadow-card); }
   .agent-card > .role { font-size: 11.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--slate); font-weight: 600; }
   .agent-row { display: flex; align-items: center; gap: 16px; }
   .agent-row + .agent-row { padding-top: 14px; border-top: 1px solid #d9e4f4; }
@@ -254,7 +259,7 @@
   .acct-item .v { font-size: 15px; color: var(--ink); margin-top: 3px; }
   @media (max-width: 620px) {
     .stat-grid { grid-template-columns: 1fr; }
-    .form-grid, .acct-grid, .pcov-grid { grid-template-columns: 1fr; }
+    .form-grid, .acct-grid, .pcov-grid, .agent-grid { grid-template-columns: 1fr; }
     .portal-header, .portal-tabs { padding-left: 18px; padding-right: 18px; }
     /* Wrap the tabs onto a second row on phones — an overflow scroller hid
        Service/Account off-screen with no hint they existed. */
@@ -397,9 +402,13 @@
         <div class="stat-card"><div class="num" id="statThird">—</div><div class="lbl" id="statThirdLbl">Certificates issued</div></div>
       </div>
       <div class="quick-actions" id="quickActions"></div>
-      <!-- Assigned Producer / CSR — each only rendered if Bindly has that role set -->
-      <div class="agent-card" id="producerCard" hidden></div>
-      <div class="agent-card" id="csrCard" hidden></div>
+      <!-- Assigned Producer / CSR — side by side on desktop, each only
+           rendered if Bindly has that role set. If only one is assigned,
+           JS adds .agent-grid-solo so it spans the full row. -->
+      <div class="agent-grid" id="agentGrid">
+        <div class="agent-card" id="producerCard" hidden></div>
+        <div class="agent-card" id="csrCard" hidden></div>
+      </div>
       <div class="portal-panel">
         <h2>Your Policies</h2>
         <ul class="policy-list" id="policyList"></ul>
@@ -714,6 +723,6 @@
   </main>
 </div>
 
-<script src="portal.js?v=52"></script>
+<script src="portal.js?v=53"></script>
 </body>
 </html>

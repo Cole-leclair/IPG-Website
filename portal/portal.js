@@ -580,6 +580,16 @@
     // server-side — the primary CSR being unassigned doesn't hide a real
     // secondary one, so this always reflects whoever's actually on file.
     renderPersonCard("csrCard", "Your CSR", a.csrs);
+    // Producer + CSR sit side by side (see .agent-grid) — but if only one
+    // is actually assigned, let it span the full row instead of sitting in
+    // a half-empty grid.
+    var agentGrid = $("agentGrid");
+    if (agentGrid) {
+      var producerCard = $("producerCard"), csrCard = $("csrCard");
+      var visibleCount = (producerCard && !producerCard.hidden ? 1 : 0) + (csrCard && !csrCard.hidden ? 1 : 0);
+      agentGrid.classList.toggle("agent-grid-solo", visibleCount === 1);
+      agentGrid.hidden = visibleCount === 0;
+    }
   }
 
   function personRow(person) {
