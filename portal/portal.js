@@ -517,12 +517,9 @@
     $("masterCoiMeta").textContent = bits.join(" · ");
     var staleBadge = $("masterCoiStale");
     if (staleBadge) staleBadge.hidden = !mc.stale;
-    var link = $("masterCoiLink");
-    link.href = mc.url;
-    // Fresh-link handling is separate from the documents 15-min-URL refresh
-    // (master_coi isn't in state.documents) — see data-dl-master-coi below.
-    link.setAttribute("data-dl-master-coi", "1");
-    link.setAttribute("target", "_blank");
+    // masterCoiLink is a plain button now — see initDocPreview for the
+    // in-page preview it opens (via portal-doc-proxy.js, resolved fresh
+    // server-side each click, not this mc.url).
     card.hidden = false;
   }
 
@@ -756,23 +753,16 @@
   var FRESH_WINDOW_MS = 13 * 60 * 1000; // refresh with a ~2 min safety margin
   function initFreshDownloads() {
     document.addEventListener("click", function (e) {
-      var a = e.target && e.target.closest ? e.target.closest("a[data-dl-doc], a[data-dl-holder], a[data-dl-master-coi]") : null;
+      var a = e.target && e.target.closest ? e.target.closest("a[data-dl-doc], a[data-dl-holder]") : null;
       if (!a) return;
       var isDoc = a.hasAttribute("data-dl-doc");
-      var isMasterCoi = a.hasAttribute("data-dl-master-coi");
       // Links are still fresh — let the browser follow them normally.
       if (state.docsLoadedAt && (Date.now() - state.docsLoadedAt) < FRESH_WINDOW_MS) return;
       e.preventDefault();
       var win = window.open("", "_blank"); // must be synchronous with the click
-      var idx = isMasterCoi ? -1 : Number(a.getAttribute(isDoc ? "data-dl-doc" : "data-dl-holder"));
-      var stale = isMasterCoi ? state.masterCoi : (isDoc ? state.documents[idx] : state.holders[idx]);
-      var refresh = isMasterCoi
-        ? PortalData.getAccount().then(function (account) {
-            state.masterCoi = (account && account.masterCoi) || null;
-            renderMasterCoi();
-            return (state.masterCoi && state.masterCoi.url) || (stale && stale.url) || "";
-          })
-        : isDoc
+      var idx = Number(a.getAttribute(isDoc ? "data-dl-doc" : "data-dl-holder"));
+      var stale = isDoc ? state.documents[idx] : state.holders[idx];
+      var refresh = isDoc
         ? PortalData.getDocuments().then(function (docs) {
             state.documents = docs || [];
             state.docsLoadedAt = Date.now();
@@ -801,6 +791,65 @@
         else { win.close(); showToast("That download didn’t work — try refreshing the page."); }
       });
     });
+  }
+
+  // ---- In-page document preview ----
+  // Bindly's PDF responses carry X-Frame-Options: SAMEORIGIN, so their signed
+  // URLs can't be embedded in an <iframe> on ipg.team. portal-doc-proxy.js
+  // fetches the bytes server-side and re-serves them from our own origin
+  // instead — this pulls them via fetch() (so the Bearer token still works,
+  // unlike a plain <iframe src>) and hands the iframe a blob: URL.
+  function initDocPreview() {
+    var modal = $("docPreviewModal");
+    var frame = $("docPreviewFrame");
+    var msg = $("docPreviewMsg");
+    var title = $("docPreviewTitle");
+    if (!modal || !frame || !msg) return;
+    var currentObjectUrl = null;
+
+    function closePreview() {
+      modal.hidden = true;
+      frame.hidden = true;
+      frame.src = "about:blank";
+      if (currentObjectUrl) { URL.revokeObjectURL(currentObjectUrl); currentObjectUrl = null; }
+    }
+
+    function openPreview(doc, label) {
+      modal.hidden = false;
+      frame.hidden = true;
+      msg.hidden = false;
+      msg.textContent = "Loading…";
+      if (title) title.textContent = label || "Preview";
+      getToken().then(function (tok) {
+        var headers = {};
+        if (tok) headers["Authorization"] = "Bearer " + tok;
+        return fetch(PORTAL_CONFIG.apiBase + "/portal-doc-proxy?doc=" + encodeURIComponent(doc), { headers: headers });
+      }).then(function (r) {
+        if (!r.ok) throw new Error("preview failed");
+        return r.blob();
+      }).then(function (blob) {
+        currentObjectUrl = URL.createObjectURL(blob);
+        frame.src = currentObjectUrl;
+        frame.hidden = false;
+        msg.hidden = true;
+      }).catch(function () {
+        msg.textContent = "Couldn’t load the preview — try again, or use Download instead.";
+      });
+    }
+
+    modal.addEventListener("click", function (e) {
+      if (e.target && e.target.closest && e.target.closest("[data-close-preview]")) closePreview();
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && !modal.hidden) closePreview();
+    });
+
+    var masterBtn = $("masterCoiLink");
+    if (masterBtn) {
+      masterBtn.addEventListener("click", function () {
+        openPreview("master-coi", "Master Certificate of Insurance");
+      });
+    }
   }
 
   // ---- Tabs ----
@@ -2265,6 +2314,7 @@
   initClientShells();
   initPlaceholderDownloads();
   initFreshDownloads();
+  initDocPreview();
   init2faExtras();
   initForgotPassword();
   initAuth();

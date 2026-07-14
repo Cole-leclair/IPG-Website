@@ -239,6 +239,11 @@
   /* The client-invite flow has a form plus a 2-column confirm grid, so it
      needs more room than the single-column team-invite popup. */
   .client-modal-card { max-width: 600px; }
+  /* Document preview: needs real screen real estate, not the ~440px default. */
+  .doc-preview-card { max-width: 860px; width: 92vw; height: 88vh; display: flex; flex-direction: column; }
+  .doc-preview-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .doc-preview-body #docPreviewMsg { text-align: center; margin: auto; }
+  #docPreviewFrame { flex: 1; width: 100%; border: 0; border-radius: 8px; }
   .portal-modal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
   .portal-modal-head h3 { margin: 0; font-size: 17px; }
   .portal-modal-x { background: none; border: 0; font-size: 26px; line-height: 1; color: var(--slate); cursor: pointer; padding: 0 4px; }
@@ -421,7 +426,23 @@
           <p class="portal-note" id="masterCoiMeta"></p>
           <span class="badge pending" id="masterCoiStale" hidden>Coverage changed since approval — call us to confirm this is current</span>
         </div>
-        <a class="btn btn-outline btn-sm" id="masterCoiLink" href="#" target="_blank" rel="noopener">Preview</a>
+        <button class="btn btn-outline btn-sm" type="button" id="masterCoiLink">Preview</button>
+      </div>
+
+      <!-- In-page document preview (avoids Bindly's X-Frame-Options by
+           streaming the PDF through our own origin — see portal-doc-proxy.js) -->
+      <div class="portal-modal" id="docPreviewModal" hidden>
+        <div class="portal-modal-backdrop" data-close-preview></div>
+        <div class="portal-modal-card doc-preview-card" role="dialog" aria-modal="true" aria-labelledby="docPreviewTitle">
+          <div class="portal-modal-head">
+            <h3 id="docPreviewTitle">Preview</h3>
+            <button class="portal-modal-x" type="button" data-close-preview aria-label="Close">&times;</button>
+          </div>
+          <div class="doc-preview-body">
+            <p class="portal-note" id="docPreviewMsg">Loading…</p>
+            <iframe id="docPreviewFrame" title="Document preview" hidden></iframe>
+          </div>
+        </div>
       </div>
 
       <!-- Certificate disclaimer -->
@@ -694,6 +715,6 @@
   </main>
 </div>
 
-<script src="portal.js?v=50"></script>
+<script src="portal.js?v=51"></script>
 </body>
 </html>
