@@ -113,6 +113,12 @@
     addHolder: function (data) {
       return authedApi("/portal-cert-holders", { method: "POST", body: data });
     },
+    // Non-standard request (a description of operations was given) — creates
+    // a Bindly Service Center ticket for agent review instead of issuing
+    // instantly. Returns { ok, status: "pending", holder }.
+    requestCoi: function (data) {
+      return authedApi("/portal-coi-requests", { method: "POST", body: data });
+    },
     // GET profile -> { name, company, email, phone, address, masterCoi }.
     // masterCoi (or null) is Bindly's approval record for the master
     // certificate — the single source of truth for that document, entirely
@@ -382,7 +388,10 @@
     // review-routed cert flow — every holder issues instantly.)
     var map = {
       active: ["active", "Active"], issued: ["issued", "Issued"],
-      expired: ["expired", "Expired"], cancelled: ["expired", "Cancelled"], pending: ["pending", "Pending"]
+      expired: ["expired", "Expired"], cancelled: ["expired", "Cancelled"], pending: ["pending", "Pending"],
+      // "review": a cert-holder-only status (see renderHolders) — distinct
+      // from a POLICY's "pending" (not yet effective), which shares this map.
+      review: ["pending", "Pending review"]
     };
     var m = map[status] || ["pending", cap(status) || ""];
     return '<span class="badge ' + m[0] + '">' + esc(m[1]) + '</span>';
@@ -476,7 +485,11 @@
       var actions = '<span class="contact-actions">';
       // Re-issue prefills the add-holder form with this holder so the client
       // can get a fresh dated certificate (e.g. at renewal) without retyping.
-      actions += '<a href="#" class="doc-dl" data-reissue="' + i + '">Re-issue</a>';
+      // Not offered for a request still under review — there's no issued
+      // certificate yet to base a re-issue on.
+      if (h.status !== "review") {
+        actions += '<a href="#" class="doc-dl" data-reissue="' + i + '">Re-issue</a>';
+      }
       if (h.status === "issued" && h.url && h.url !== "#") {
         actions += '<a class="doc-dl" href="' + esc(h.url) + '" data-dl-holder="' + i + '" target="_blank" rel="noopener">Download</a>';
       }
@@ -841,11 +854,21 @@
     return out;
   }
 
-  // ---- Add a certificate holder (self-service) ----
+  // ---- Add a certificate holder (self-service, or a reviewed request) ----
   function initHolderForm() {
     var form = $("holderForm");
     if (!form) return;
     var msg = $("holderMsg");
+    var descField = $("hDesc");
+    var descAlert = $("hDescAlert");
+
+    // A description of operations means this ISN'T a standard instant cert —
+    // it needs an IPG agent's review (see coi-request modal below).
+    if (descField && descAlert) {
+      descField.addEventListener("input", function () {
+        descAlert.hidden = !descField.value.trim();
+      });
+    }
 
     function submit(data) {
       var btn = form.querySelector('button[type="submit"]');
@@ -855,6 +878,7 @@
           state.holders.unshift(res.holder);
           renderHolders(); updateStats();
           form.reset();
+          if (descAlert) descAlert.hidden = true;
           msg.className = "portal-msg ok";
           msg.textContent = "Certificate issued — download it from the list below.";
         }
@@ -863,6 +887,63 @@
         msg.textContent = (err && err.message) || "We couldn’t issue that certificate. Please try again.";
       }).finally(function () {
         if (btn) { btn.disabled = false; btn.textContent = "Add holder"; }
+      });
+    }
+
+    // ---- Description-of-operations request: email + notes popup ----
+    var coiModal = $("coiRequestModal");
+    var coiForm = $("coiRequestForm");
+    var coiMsg = $("coiRequestMsg");
+    var pendingCoi = null; // { data, description } captured from the main form
+
+    function openCoiModal(data, description) {
+      pendingCoi = { data: data, description: description };
+      if (coiForm) coiForm.reset();
+      if (coiMsg) { coiMsg.className = "portal-msg"; coiMsg.textContent = ""; }
+      if (coiModal) coiModal.hidden = false;
+      var email = $("crEmail"); if (email) email.focus();
+    }
+    function closeCoiModal() { if (coiModal) coiModal.hidden = true; pendingCoi = null; }
+
+    if (coiModal) {
+      coiModal.addEventListener("click", function (e) {
+        if (e.target && e.target.closest && e.target.closest("[data-close-coi]")) closeCoiModal();
+      });
+      document.addEventListener("keydown", function (e) {
+        if (e.key === "Escape" && !coiModal.hidden) closeCoiModal();
+      });
+    }
+    if (coiForm) {
+      coiForm.addEventListener("submit", function (e) {
+        e.preventDefault();
+        if (!pendingCoi) return;
+        if (!coiForm.checkValidity()) { coiForm.reportValidity(); return; }
+        var payload = {
+          name: pendingCoi.data.name, address1: pendingCoi.data.address1,
+          address2: pendingCoi.data.address2, city: pendingCoi.data.city,
+          state: pendingCoi.data.state, zip: pendingCoi.data.zip,
+          description_of_operations: pendingCoi.description,
+          email: $("crEmail").value.trim(),
+          notes: $("crNotes") ? $("crNotes").value.trim() : ""
+        };
+        var btn = coiForm.querySelector('button[type="submit"]');
+        if (btn) { btn.disabled = true; btn.textContent = "Submitting…"; }
+        PortalData.requestCoi(payload).then(function (res) {
+          if (res && res.ok) {
+            state.holders.unshift(res.holder);
+            renderHolders(); updateStats();
+            closeCoiModal();
+            form.reset();
+            if (descAlert) descAlert.hidden = true;
+            msg.className = "portal-msg ok";
+            msg.textContent = "Request submitted for review — we’ll email the certificate once it’s approved.";
+          }
+        }).catch(function (err) {
+          coiMsg.className = "portal-msg err";
+          coiMsg.textContent = (err && err.message) || "We couldn’t submit that request. Please try again.";
+        }).finally(function () {
+          if (btn) { btn.disabled = false; btn.textContent = "Submit request"; }
+        });
       });
     }
 
@@ -879,6 +960,7 @@
         state: $("hState").value,
         zip: $("hZip").value
       };
+      var description = descField ? descField.value.trim() : "";
       // Warn on a duplicate holder name so the client doesn't issue two certs
       // for the same holder by accident (re-issue at renewal is a real case,
       // so we confirm rather than block).
@@ -886,6 +968,7 @@
         return (h.name || "").trim().toLowerCase() === data.name.toLowerCase();
       });
       if (dupe && !window.confirm('A certificate for “' + data.name + '” already exists. Issue another one?')) return;
+      if (description) { openCoiModal(data, description); return; }
       submit(data);
     });
 

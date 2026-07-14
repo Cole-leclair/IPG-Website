@@ -217,6 +217,7 @@
   .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
   .form-field.full { grid-column: 1 / -1; }
   .lbl-hint { font-weight: 400; color: var(--slate); font-size: 12px; }
+  .coi-alert { color: #9a6a1c; background: var(--honey-soft); border: 1px solid #ecdcbb; border-radius: 8px; padding: 10px 12px; margin-top: 8px !important; font-size: 12.5px; line-height: 1.5; }
   /* ---- Admin: invite form + confirm ---- */
   #inviteForm select, #teamInviteForm select { width: 100%; padding: 11px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--white); font: inherit; color: var(--ink); }
   /* The confirm-screen's Account type field sits among plain-text summary
@@ -426,7 +427,7 @@
       <!-- Certificate disclaimer -->
       <div class="cert-disclaimer">
         <h3>Please review before sending</h3>
-        <p>Certificates you issue here are generated instantly from your coverage on file — please double-check the details before sending one to a third party. If any policy shown is no longer active, has been cancelled, or has changed, contact us immediately at (214) 377-1460 so we can help before you rely on it.</p>
+        <p>Certificates you issue here are generated instantly from your coverage on file — please double-check the details before sending one to a third party. If any policy shown is no longer active, has been cancelled, or has changed, contact us immediately at (214) 377-1460 so we can help before you rely on it. Adding a description of operations below isn&rsquo;t instant — those requests are reviewed by an IPG agent first.</p>
       </div>
 
       <!-- Add a holder -->
@@ -455,10 +456,36 @@
               </select>
             </div>
             <div class="form-field"><label for="hZip">ZIP</label><input id="hZip" type="text" maxlength="20" required></div>
+            <div class="form-field full">
+              <label for="hDesc">Description of operations <span class="lbl-hint">(optional — for non-standard requests)</span></label>
+              <textarea id="hDesc" rows="3" maxlength="2000"></textarea>
+              <p class="portal-note coi-alert" id="hDescAlert" hidden>This isn&rsquo;t a standard certificate — adding a description of operations means an IPG agent has to review and approve it before it&rsquo;s issued, so it won&rsquo;t be instant.</p>
+            </div>
           </div>
           <button class="btn btn-primary btn-sm" type="submit">Add holder</button>
           <p class="portal-msg" id="holderMsg" aria-live="polite"></p>
         </form>
+      </div>
+
+      <!-- Description-of-operations request: email + notes popup -->
+      <div class="portal-modal" id="coiRequestModal" hidden>
+        <div class="portal-modal-backdrop" data-close-coi></div>
+        <div class="portal-modal-card" role="dialog" aria-modal="true" aria-labelledby="coiRequestModalTitle">
+          <div class="portal-modal-head">
+            <h3 id="coiRequestModalTitle">Send this request for review</h3>
+            <button class="portal-modal-x" type="button" data-close-coi aria-label="Close">&times;</button>
+          </div>
+          <p class="portal-note" style="margin:0 0 16px;">Because this certificate includes a description of operations, an IPG agent needs to review and approve it before it&rsquo;s issued. Tell us where to send the finished certificate.</p>
+          <form id="coiRequestForm" novalidate>
+            <div class="form-field full"><label for="crEmail">Send the approved certificate to</label><input id="crEmail" type="email" maxlength="254" required></div>
+            <div class="form-field full"><label for="crNotes">Additional notes <span class="lbl-hint">(optional)</span></label><textarea id="crNotes" rows="3" maxlength="1000"></textarea></div>
+            <div class="invite-confirm-actions" style="margin-top:8px;">
+              <button class="btn btn-primary btn-sm" type="submit">Submit request</button>
+              <button class="btn btn-outline btn-sm" type="button" data-close-coi>Cancel</button>
+            </div>
+            <p class="portal-msg" id="coiRequestMsg" aria-live="polite"></p>
+          </form>
+        </div>
       </div>
 
       <!-- Holders / issued certs -->
@@ -667,6 +694,6 @@
   </main>
 </div>
 
-<script src="portal.js?v=49"></script>
+<script src="portal.js?v=50"></script>
 </body>
 </html>

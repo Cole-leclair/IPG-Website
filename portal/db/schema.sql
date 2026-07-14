@@ -51,23 +51,30 @@ create table if not exists invitations (
 create index if not exists invitations_email_idx on invitations (lower(email));
 
 -- ---------------------------------------------------------------------
--- cert_holders — holders on a client's master COI. COMMERCIAL only.
--- Simplified 2026-07-10: client supplies name/address only; always
--- instant issue. No wording/review columns.
+-- cert_holders — was unused after the 2026-07-10 simplification (client
+-- self-service certs are instant, no rows written here). Repurposed
+-- 2026-07-14 to track description-of-operations COI requests, which DO
+-- need a review step: a row here is the record of a pending Bindly
+-- coi-request ticket until a matching real certificate shows up in
+-- Bindly's own certificates list (see portal-cert-holders.js).
 -- ---------------------------------------------------------------------
 create table if not exists cert_holders (
-  id                uuid primary key default gen_random_uuid(),
-  portal_user_id    uuid references portal_users(id) on delete set null,
-  bindly_client_id  text not null,
-  holder_name       text not null,
-  holder_address    text,
-  status            text not null default 'issued',    -- only 'issued' today; kept for future use
-  bindly_cert_id    text,                               -- issued cert id in Bindly
-  issued_doc_ref    text,                               -- handle to the ACORD 25 in Bindly
-  created_at        timestamptz not null default now(),
-  updated_at        timestamptz
+  id                         uuid primary key default gen_random_uuid(),
+  portal_user_id             uuid references portal_users(id) on delete set null,
+  bindly_client_id           text not null,
+  holder_name                text not null,
+  holder_address             text,
+  status                     text not null default 'pending' check (status in ('pending','resolved')),
+  bindly_cert_id             text,                       -- unused (kept for compat)
+  issued_doc_ref             text,                       -- unused (kept for compat)
+  bindly_request_id          text unique,                -- Bindly's coi-request ticket id
+  description_of_operations  text,                       -- what the client entered, for our own record
+  created_at                 timestamptz not null default now(),
+  updated_at                 timestamptz
 );
 create index if not exists cert_holders_client_idx on cert_holders (bindly_client_id);
+alter table cert_holders add column if not exists bindly_request_id text unique;
+alter table cert_holders add column if not exists description_of_operations text;
 
 -- ---------------------------------------------------------------------
 -- portal_contacts — additional reference contacts (billing/safety/etc.)

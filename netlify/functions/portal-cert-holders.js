@@ -1,17 +1,22 @@
-// GET  /portal/cert-holders — certificates already issued for this client
+// GET  /portal/cert-holders — issued certificates PLUS any pending
+//      description-of-operations requests (see portal-coi-requests.js)
 // POST /portal/cert-holders — add a holder (SELF-SERVICE, always instant issue)
 // COMMERCIAL ACCOUNTS ONLY. Maps to PortalData.getHolders() / addHolder().
 //
-// The client only ever supplies holder name + address (street/city/state/zip),
-// so every certificate is standard ACORD 25 wording off the master COI — no
-// wording selection, no review routing. Bindly runs the SAME generator its
-// agents use and files the PDF in the client's Cert Holders folder, so agents
-// see every portal-issued cert in Bindly's normal Details view.
+// The client only ever supplies holder name + address (street/city/state/zip)
+// here, so every certificate THIS endpoint issues is standard ACORD 25
+// wording off the master COI — no wording selection, no review routing.
+// Bindly runs the SAME generator its agents use and files the PDF in the
+// client's Cert Holders folder, so agents see every portal-issued cert in
+// Bindly's normal Details view. Requests that DO need review (a description
+// of operations) go through portal-coi-requests.js instead, and show up
+// here as a "pending" row until resolved.
 var auth = require("./utils/auth");
 var bindly = require("./utils/bindly");
 var respond = require("./utils/respond");
 var audit = require("./utils/audit");
 var ratelimit = require("./utils/ratelimit");
+var coiRequests = require("./utils/coi-requests");
 
 var MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 function fmtDate(s) {
@@ -71,7 +76,34 @@ exports.handler = async function (event) {
           url: h.url || ""
         };
       });
-      return respond.json(200, { holders: holders });
+
+      // Merge in any still-open description-of-operations requests. A
+      // pending row is considered resolved once a REAL issued certificate
+      // with the same holder name shows up above — that's Bindly's own
+      // signal an agent finished the ticket, without us having to parse
+      // whatever ticket-stage strings their Service Center uses.
+      var issuedNames = {};
+      holders.forEach(function (h) { issuedNames[(h.name || "").trim().toLowerCase()] = true; });
+      var pending = await coiRequests.listPending(ctx.bindlyClientId);
+      var pendingRows = [];
+      for (var i = 0; i < pending.length; i++) {
+        var p = pending[i];
+        var key = (p.holder_name || "").trim().toLowerCase();
+        if (issuedNames[key]) {
+          await coiRequests.markResolved(p.id);
+          continue;
+        }
+        pendingRows.push({
+          id: p.id,
+          name: p.holder_name || "",
+          address: p.holder_address || "",
+          status: "review", // distinct from a policy's "pending" — see statusBadge in portal.js
+          date: fmtDate(p.created_at),
+          url: ""
+        });
+      }
+
+      return respond.json(200, { holders: pendingRows.concat(holders) });
     }
 
     // POST — add a holder. Always instant issue off the master COI.
