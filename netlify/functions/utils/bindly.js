@@ -29,6 +29,10 @@ function configured() {
 //              failures; 404 and 429 are passed through so callers can react —
 //              e.g. cert-holders treats 404 as "this client isn't cert-ready").
 //   .upstreamStatus / .upstreamError — what Bindly actually said (for logs).
+// `body` is normally a plain object (sent as JSON). Pass a FormData instance
+// instead to send multipart/form-data (e.g. createCoiRequestWithFiles below)
+// — fetch sets the correct Content-Type + boundary itself, so we must NOT
+// set Content-Type ourselves in that case.
 async function call(method, path, body) {
   if (!configured()) {
     var e = new Error("bindly portal API not configured — set BINDLY_READ_API_URL + BINDLY_PORTAL_API_KEY");
@@ -36,16 +40,16 @@ async function call(method, path, body) {
     throw e;
   }
 
+  var isFormData = typeof FormData !== "undefined" && body instanceof FormData;
+  var headers = { "X-API-Key": API_KEY, "Accept": "application/json" };
+  if (!isFormData) headers["Content-Type"] = "application/json";
+
   var res;
   try {
     res = await fetch(READ_BASE.replace(/\/$/, "") + path, {
       method: method,
-      headers: {
-        "X-API-Key": API_KEY,
-        "Content-Type": "application/json",
-        "Accept": "application/json"
-      },
-      body: body ? JSON.stringify(body) : undefined
+      headers: headers,
+      body: isFormData ? body : (body ? JSON.stringify(body) : undefined)
     });
   } catch (netErr) {
     var eNet = new Error("bindly unreachable: " + netErr.message);
@@ -125,8 +129,41 @@ module.exports = {
   // Create response includes draft_attached (bool). Poll getCoiRequest for
   // status — its response includes delivery_status ("pending"|"sent"),
   // sent_to, sent_at, draft_attached.
+  //
+  // If data.attachment is present ({ filename, contentType, base64 }), this
+  // sends multipart/form-data instead of JSON (per Bindly's 2026-07-14
+  // attachment update) — the file lands as a REAL attachment on the ticket
+  // next to the draft cert, no hosting on our side. Response then also
+  // includes attachments: [filename, ...] confirming what was accepted.
+  // Limits are Bindly's (pdf/doc/docx/xls/xlsx/csv/txt/png/jpg/eml/msg,
+  // 15MB/file) — but the file still has to reach US first as base64 JSON
+  // from the browser, so our own request-size ceiling (~4.2MB raw) is the
+  // real limit today, not Bindly's.
   createCoiRequest: function (clientId, data) {
-    return call("POST", "/clients/" + encodeURIComponent(clientId) + "/coi-requests", data);
+    var path = "/clients/" + encodeURIComponent(clientId) + "/coi-requests";
+    var attachment = data && data.attachment;
+    if (!attachment) return call("POST", path, data);
+
+    var form = new FormData();
+    Object.keys(data).forEach(function (key) {
+      if (key === "attachment") return;
+      var v = data[key];
+      if (v !== undefined && v !== null) form.append(key, v);
+    });
+    var bytes = Buffer.from(attachment.base64, "base64");
+    var blob = new Blob([bytes], { type: attachment.contentType || "application/octet-stream" });
+    form.append("file", blob, attachment.filename || "attachment");
+    return call("POST", path, form);
+  },
+  // Option B (not currently used by the portal, kept for a possible future
+  // "add another document to an already-submitted request" flow): attach a
+  // file to an existing ticket. attachment: { filename, contentType, base64 }.
+  addCoiRequestAttachment: function (requestId, attachment) {
+    var form = new FormData();
+    var bytes = Buffer.from(attachment.base64, "base64");
+    var blob = new Blob([bytes], { type: attachment.contentType || "application/octet-stream" });
+    form.append("file", blob, attachment.filename || "attachment");
+    return call("POST", "/coi-requests/" + encodeURIComponent(requestId) + "/attachments", form);
   },
   getCoiRequest: function (requestId) {
     return call("GET", "/coi-requests/" + encodeURIComponent(requestId));

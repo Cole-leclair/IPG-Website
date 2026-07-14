@@ -962,15 +962,20 @@
     var coiFileName = $("crFileName");
     var pendingCoi = null; // { data, description } captured from the main form
 
-    // Bindly has no attachment field on coi-requests, so a selected file is
-    // uploaded to our own storage (portal-coi-attachment.js) and its link
-    // gets folded into the notes text on submit — see the ALLOWED map below,
-    // which mirrors utils/attachments.js server-side.
-    var COI_FILE_MAX_BYTES = 4.2 * 1024 * 1024; // matches utils/attachments.js server-side
+    // A selected file goes straight through to Bindly as a real ticket
+    // attachment (portal-coi-requests.js forwards it via multipart) — mirrors
+    // Bindly's accepted types. Bindly allows up to 15MB/file, but the file
+    // still reaches US first as base64 JSON, so OUR request-size ceiling
+    // (~4.2MB raw) is the real limit — matches portal-coi-requests.js server-side.
+    var COI_FILE_MAX_BYTES = 4.2 * 1024 * 1024;
     var COI_FILE_ALLOWED_TYPES = {
-      "application/pdf": true, "image/jpeg": true, "image/png": true,
+      "application/pdf": true,
       "application/msword": true,
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document": true
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document": true,
+      "application/vnd.ms-excel": true,
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": true,
+      "text/csv": true, "text/plain": true,
+      "image/png": true, "image/jpeg": true
     };
     if (coiFile && coiFileName) {
       coiFile.addEventListener("change", function () {
@@ -1021,7 +1026,7 @@
         var file = coiFile && coiFile.files && coiFile.files[0];
         if (file && !COI_FILE_ALLOWED_TYPES[file.type]) {
           coiMsg.className = "portal-msg err";
-          coiMsg.textContent = "Please attach a PDF, Word document, or image (jpg/png).";
+          coiMsg.textContent = "That file type isn’t supported — try a PDF, Word/Excel doc, image, or text file.";
           return;
         }
         if (file && file.size > COI_FILE_MAX_BYTES) {
@@ -1050,8 +1055,14 @@
             closeCoiModal();
             form.reset();
             if (descAlert) descAlert.hidden = true;
-            msg.className = "portal-msg ok";
-            msg.textContent = "Request submitted for review — we’ll email the certificate once it’s approved.";
+            // Bindly's own advice: its response says exactly what it
+            // accepted — don't tell the client their file attached if
+            // Bindly's response didn't actually confirm that.
+            var attachmentNote = res.attachmentAccepted === false
+              ? " Your document didn’t attach, though — please call us or try again."
+              : "";
+            msg.className = res.attachmentAccepted === false ? "portal-msg err" : "portal-msg ok";
+            msg.textContent = "Request submitted for review — we’ll email the certificate once it’s approved." + attachmentNote;
           }
         }).catch(function (err) {
           coiMsg.className = "portal-msg err";

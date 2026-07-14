@@ -15,22 +15,38 @@
 // "sent" (checked fresh each time the holder list loads).
 //
 // Optional client attachment (e.g. their own insurance requirements doc):
-// Bindly's API has no attachment field, so we host the file ourselves
-// (utils/attachments.js, Netlify Blobs) and append a link to it in the
-// notes text the agent sees on the ticket.
+// Bindly added native multipart attachment support the same day (2026-07-14,
+// later) — bindly.createCoiRequest sends it straight through as a real
+// ticket attachment next to the draft cert. We don't host anything anymore
+// (the earlier Netlify Blobs approach was removed). Bindly's own limits are
+// generous (15MB/file, more file types), but the file still reaches US first
+// as base64 JSON from the browser, so OUR request-size ceiling (~4.2MB raw)
+// is the real limit today.
 var auth = require("./utils/auth");
 var bindly = require("./utils/bindly");
 var respond = require("./utils/respond");
 var audit = require("./utils/audit");
 var ratelimit = require("./utils/ratelimit");
 var coiRequests = require("./utils/coi-requests");
-var attachments = require("./utils/attachments");
 
 var LIMITS = {
   holder_name: 200, address1: 120, address2: 120, city: 80, state: 20, zip: 20,
   description: 2000, email: 254, notes: 1000
 };
 function s(v, max) { return String(v == null ? "" : v).trim().slice(0, max); }
+
+// Mirrors Bindly's accepted types for coi-request attachments.
+var ATTACHMENT_MAX_BYTES = 4.2 * 1024 * 1024;
+var ATTACHMENT_ALLOWED_TYPES = {
+  "application/pdf": true,
+  "application/msword": true,
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": true,
+  "application/vnd.ms-excel": true,
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": true,
+  "text/csv": true, "text/plain": true,
+  "image/png": true, "image/jpeg": true,
+  "message/rfc822": true // .eml
+};
 
 function displayAddress(f) {
   var street = [f.address1, f.address2].filter(Boolean).join(", ");
@@ -78,22 +94,28 @@ exports.handler = async function (event) {
     if (!description) return respond.json(400, { error: "description of operations is required" });
     if (!/^\S+@\S+\.\S+$/.test(email)) return respond.json(400, { error: "a valid email is required" });
 
-    // Optional attachment — save it FIRST so a bad file fails fast with a
-    // clear error instead of creating a ticket the client thinks failed.
-    var attachmentUrl = "";
-    if (body.attachment && body.attachment.base64) {
-      var saved_attachment = await attachments.save({
-        filename: body.attachment.filename,
-        contentType: body.attachment.contentType,
+    // Optional attachment — validate BEFORE calling Bindly so a bad file
+    // fails fast with a clear error instead of creating a half-done ticket.
+    var attachment = null;
+    var hasAttachment = !!(body.attachment && body.attachment.base64);
+    if (hasAttachment) {
+      var contentType = String(body.attachment.contentType || "").toLowerCase();
+      if (!ATTACHMENT_ALLOWED_TYPES[contentType]) {
+        return respond.json(400, { error: "That file type isn’t supported — try a PDF, Word/Excel doc, image, or text file." });
+      }
+      var rawBytes;
+      try { rawBytes = Buffer.from(String(body.attachment.base64), "base64"); }
+      catch (e4) { return respond.json(400, { error: "That file couldn’t be read — please try again." }); }
+      if (!rawBytes.length) return respond.json(400, { error: "That file appears to be empty." });
+      if (rawBytes.length > ATTACHMENT_MAX_BYTES) {
+        return respond.json(400, { error: "That file is too large — please keep attachments under 4.2MB." });
+      }
+      attachment = {
+        filename: s(body.attachment.filename, 200) || "attachment",
+        contentType: contentType,
         base64: body.attachment.base64
-      }, event);
-      var host = (event.headers && (event.headers["x-forwarded-host"] || event.headers.host)) || "ipg.team";
-      var proto = (event.headers && event.headers["x-forwarded-proto"]) || "https";
-      attachmentUrl = proto + "://" + host + "/.netlify/functions/portal-coi-attachment?id=" + encodeURIComponent(saved_attachment.id);
+      };
     }
-    var notesWithAttachment = attachmentUrl
-      ? (notes ? notes + "\n\n" : "") + "Client attached a document: " + attachmentUrl
-      : notes;
 
     var created;
     try {
@@ -106,8 +128,9 @@ exports.handler = async function (event) {
         zip: fields.zip,
         desc_ops: description,
         delivery_email: email,
-        notes: notesWithAttachment,
-        requested_by: ctx.authUserId
+        notes: notes,
+        requested_by: ctx.authUserId,
+        attachment: attachment
       });
     } catch (err) {
       if (err.upstreamStatus === 404) {
@@ -135,14 +158,19 @@ exports.handler = async function (event) {
       }
     }
 
+    // Bindly's own advice: the response lists exactly what it accepted —
+    // don't assume the attachment made it on just because we sent it.
+    var acceptedAttachment = !!(hasAttachment && created && Array.isArray(created.attachments) && created.attachments.length);
+
     await audit.log({
-      action: attachmentUrl ? "coi_request_created_with_attachment" : "coi_request_created",
+      action: hasAttachment ? "coi_request_created_with_attachment" : "coi_request_created",
       actor: ctx.authUserId,
       bindlyClientId: ctx.bindlyClientId, target: fields.holder_name, event: event
     });
 
     return respond.json(201, {
       ok: true, status: "review",
+      attachmentAccepted: hasAttachment ? acceptedAttachment : null,
       holder: {
         id: (saved && saved.id) || requestId || fields.holder_name,
         name: fields.holder_name,
