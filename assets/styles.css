@@ -461,7 +461,7 @@
   .review-top .g-mark { width: 18px; height: 18px; flex-shrink: 0; }
   .review-stars { color: #FBBC05; font-size: 14px; letter-spacing: 1.5px; }
   .review-card p.quote { color: var(--ink); font-size: 14px; line-height: 1.6; margin: 0; flex-grow: 1; }
-  .greviews-cta { text-align: center; margin-top: 40px; }
+  .greviews-cta { display: flex; justify-content: center; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 40px; }
 
   /* ---------- Team ---------- */
   .team-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 28px; max-width: 860px; margin: 0 auto; }

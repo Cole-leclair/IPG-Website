@@ -623,9 +623,11 @@
     var actions = state.commercial
       ? [["Request a certificate", "certificates"], ["View documents", "documents"]]
       : [["View my ID cards", "documents"], ["Account & contacts", "account"]];
-    el.innerHTML = actions.map(function (a) {
+    var html = actions.map(function (a) {
       return '<button class="btn btn-outline btn-sm" type="button" data-goto="' + a[1] + '">' + esc(a[0]) + '</button>';
     }).join("");
+    html += '<a class="btn btn-outline btn-sm" href="https://g.page/r/CVLf8P6cAXBkEBM/review" target="_blank" rel="noopener noreferrer">Leave us a review</a>';
+    el.innerHTML = html;
   }
 
   function renderContacts() {
