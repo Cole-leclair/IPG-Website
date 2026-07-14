@@ -116,11 +116,15 @@ module.exports = {
     return call("POST", "/clients/" + encodeURIComponent(clientId) + "/certificates", data);
   },
 
-  // ---- Non-standard COI requests (waiver of subrogation, special wording…).
-  // Routes to IPG's Service Center as a ticket; poll getCoiRequest for status.
-  // NOTE: the client-facing portal deliberately offers ONLY instant standard
-  // certs (E&O guardrail), so these have no caller today — kept for a possible
-  // future staff-reviewed flow. Body: { holder_name, requirements, requested_by }.
+  // ---- Non-standard COI requests (description of operations, special
+  // wording…) — used by portal-coi-requests.js. Routes to IPG's Service
+  // Center as a ticket, generates a draft ACORD 25 (attached to the ticket,
+  // never portal-visible) and gives the agent a one-click send action.
+  // Body (per Bindly's 2026-07-14 update): { holder_name, address1, address2,
+  // city, state, zip, desc_ops, delivery_email, notes, requested_by }.
+  // Create response includes draft_attached (bool). Poll getCoiRequest for
+  // status — its response includes delivery_status ("pending"|"sent"),
+  // sent_to, sent_at, draft_attached.
   createCoiRequest: function (clientId, data) {
     return call("POST", "/clients/" + encodeURIComponent(clientId) + "/coi-requests", data);
   },

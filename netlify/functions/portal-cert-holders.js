@@ -77,22 +77,30 @@ exports.handler = async function (event) {
         };
       });
 
-      // Merge in any still-open description-of-operations requests. A
-      // pending row is considered resolved once a REAL issued certificate
-      // with the same holder name shows up above — that's Bindly's own
-      // signal an agent finished the ticket, without us having to parse
-      // whatever ticket-stage strings their Service Center uses.
+      // Merge in any still-open description-of-operations requests. Resolved
+      // once Bindly's own delivery_status flips to "sent" (checked fresh here
+      // — see utils/bindly.js) — that's the authoritative signal an agent
+      // actually sent the certificate. Falls back to "a real issued cert with
+      // this holder name showed up" only if the ticket check itself fails,
+      // so a transient Bindly error never wrongly hides a pending request.
       var issuedNames = {};
       holders.forEach(function (h) { issuedNames[(h.name || "").trim().toLowerCase()] = true; });
       var pending = await coiRequests.listPending(ctx.bindlyClientId);
       var pendingRows = [];
       for (var i = 0; i < pending.length; i++) {
         var p = pending[i];
-        var key = (p.holder_name || "").trim().toLowerCase();
-        if (issuedNames[key]) {
-          await coiRequests.markResolved(p.id);
-          continue;
+        var resolved = false;
+        if (p.bindly_request_id) {
+          try {
+            var ticket = await bindly.getCoiRequest(p.bindly_request_id);
+            resolved = !!(ticket && ticket.delivery_status === "sent");
+          } catch (ticketErr) {
+            resolved = issuedNames[(p.holder_name || "").trim().toLowerCase()] || false;
+          }
+        } else {
+          resolved = issuedNames[(p.holder_name || "").trim().toLowerCase()] || false;
         }
+        if (resolved) { await coiRequests.markResolved(p.id); continue; }
         pendingRows.push({
           id: p.id,
           name: p.holder_name || "",

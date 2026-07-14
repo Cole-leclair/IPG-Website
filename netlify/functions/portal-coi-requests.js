@@ -3,13 +3,16 @@
 // can't be the standard instant name+address cert from
 // portal-cert-holders.js). COMMERCIAL ACCOUNTS ONLY.
 //
-// Bindly's coi-requests API takes only { holder_name, requirements,
-// requested_by } and has no field for "email the finished cert to" — so the
-// email + any additional notes are folded into the requirements text IPG's
-// Service Center sees on the ticket. The ticket id is also saved to our own
-// cert_holders table (see utils/coi-requests.js) so portal-cert-holders.js
-// can show it as "Pending review" until a real matching certificate shows
-// up in Bindly.
+// Bindly's coi-requests API (updated 2026-07-14) now takes dedicated fields —
+// holder_name/address1/address2/city/state/zip/desc_ops/delivery_email/notes/
+// requested_by — persists all of them on the ticket, generates a draft ACORD
+// 25 (with the description of operations on the PDF) and attaches it at
+// request time, and gives the agent a one-click "send to {delivery_email}"
+// action. The draft never appears in GET /certificates or gets a portal-
+// facing URL until an agent actually sends it. The ticket id is saved to our
+// own cert_holders table (see utils/coi-requests.js) so portal-cert-holders.js
+// can show it as "Pending review" until Bindly's delivery_status flips to
+// "sent" (checked fresh each time the holder list loads).
 var auth = require("./utils/auth");
 var bindly = require("./utils/bindly");
 var respond = require("./utils/respond");
@@ -69,15 +72,18 @@ exports.handler = async function (event) {
     if (!description) return respond.json(400, { error: "description of operations is required" });
     if (!/^\S+@\S+\.\S+$/.test(email)) return respond.json(400, { error: "a valid email is required" });
 
-    var requirements = "Description of operations: " + description +
-      "\n\nSend the approved certificate to: " + email +
-      "\nAdditional notes: " + (notes || "(none)");
-
     var created;
     try {
       created = await bindly.createCoiRequest(ctx.bindlyClientId, {
         holder_name: fields.holder_name,
-        requirements: requirements,
+        address1: fields.address1,
+        address2: fields.address2,
+        city: fields.city,
+        state: fields.state,
+        zip: fields.zip,
+        desc_ops: description,
+        delivery_email: email,
+        notes: notes,
         requested_by: ctx.authUserId
       });
     } catch (err) {
