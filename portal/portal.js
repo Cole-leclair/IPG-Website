@@ -829,7 +829,10 @@
         return r.blob();
       }).then(function (blob) {
         currentObjectUrl = URL.createObjectURL(blob);
-        frame.src = currentObjectUrl;
+        // #navpanes=0 hides the browser PDF viewer's thumbnail sidebar so the
+        // certificate itself gets the full width — a standard PDF open
+        // parameter honored by Chrome/Edge's built-in viewer.
+        frame.src = currentObjectUrl + "#navpanes=0";
         frame.hidden = false;
         msg.hidden = true;
       }).catch(function () {
