@@ -19,9 +19,11 @@ function getStore(event) {
   return blobs.getStore("coi-attachments");
 }
 
-// 4MB raw keeps the base64-encoded request comfortably under Netlify
-// Functions' request body limit.
-var MAX_BYTES = 4 * 1024 * 1024;
+// Netlify Functions have a hard 6MB request payload limit (AWS Lambda
+// underneath), and base64 inflates the raw file by ~33% — 4.2MB raw comes
+// out to ~5.6MB encoded, leaving real margin under that ceiling. Going much
+// higher risks the request failing outright rather than a clean 400.
+var MAX_BYTES = 4.2 * 1024 * 1024;
 var ALLOWED_TYPES = {
   "application/pdf": true,
   "image/jpeg": true,
@@ -46,7 +48,7 @@ async function save(fields, event) {
   try { buf = Buffer.from(String(fields.base64 || ""), "base64"); }
   catch (e) { throw err(400, "That file couldn’t be read — please try again."); }
   if (!buf.length) throw err(400, "That file appears to be empty.");
-  if (buf.length > MAX_BYTES) throw err(400, "That file is too large — please keep attachments under 4MB.");
+  if (buf.length > MAX_BYTES) throw err(400, "That file is too large — please keep attachments under 4.2MB.");
 
   var id = crypto.randomUUID();
   var store = getStore(event);

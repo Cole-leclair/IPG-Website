@@ -966,7 +966,7 @@
     // uploaded to our own storage (portal-coi-attachment.js) and its link
     // gets folded into the notes text on submit — see the ALLOWED map below,
     // which mirrors utils/attachments.js server-side.
-    var COI_FILE_MAX_BYTES = 4 * 1024 * 1024;
+    var COI_FILE_MAX_BYTES = 4.2 * 1024 * 1024; // matches utils/attachments.js server-side
     var COI_FILE_ALLOWED_TYPES = {
       "application/pdf": true, "image/jpeg": true, "image/png": true,
       "application/msword": true,
@@ -1026,7 +1026,7 @@
         }
         if (file && file.size > COI_FILE_MAX_BYTES) {
           coiMsg.className = "portal-msg err";
-          coiMsg.textContent = "That file is too large — please keep attachments under 4MB.";
+          coiMsg.textContent = "That file is too large — please keep attachments under 4.2MB.";
           return;
         }
         var payload = {
