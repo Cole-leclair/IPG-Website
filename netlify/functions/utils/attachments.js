@@ -8,8 +8,14 @@
 
 var crypto = require("crypto");
 
-function getStore() {
+// These are classic Lambda-style handlers (exports.handler = async (event) =>
+// ...), so Netlify Blobs' zero-config mode needs connectLambda(event) called
+// first to pull the store's site/token context out of that event — without
+// it, getStore() has nothing to connect to and throws "environment has not
+// been configured to use Netlify Blobs".
+function getStore(event) {
   var blobs = require("@netlify/blobs");
+  if (event) blobs.connectLambda(event);
   return blobs.getStore("coi-attachments");
 }
 
@@ -31,7 +37,7 @@ function err(status, message) {
 }
 
 // fields: { filename, contentType, base64 }. Returns { id }.
-async function save(fields) {
+async function save(fields, event) {
   var contentType = String(fields.contentType || "").toLowerCase();
   if (!ALLOWED_TYPES[contentType]) {
     throw err(400, "Please attach a PDF, Word document, or image (jpg/png).");
@@ -43,7 +49,7 @@ async function save(fields) {
   if (buf.length > MAX_BYTES) throw err(400, "That file is too large — please keep attachments under 4MB.");
 
   var id = crypto.randomUUID();
-  var store = getStore();
+  var store = getStore(event);
   await store.set(id, buf, {
     metadata: {
       contentType: contentType,
@@ -54,8 +60,8 @@ async function save(fields) {
 }
 
 // Returns { buffer, contentType, filename } or null if not found.
-async function get(id) {
-  var store = getStore();
+async function get(id, event) {
+  var store = getStore(event);
   var blob = await store.getWithMetadata(id, { type: "arrayBuffer" });
   if (!blob) return null;
   var meta = blob.metadata || {};

@@ -15,7 +15,7 @@ exports.handler = async function (event) {
   if (!id) return respond.json(400, { error: "missing id" });
 
   try {
-    var file = await attachments.get(id);
+    var file = await attachments.get(id, event);
     if (!file) return respond.json(404, { error: "not found" });
     return {
       statusCode: 200,

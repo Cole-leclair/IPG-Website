@@ -86,7 +86,7 @@ exports.handler = async function (event) {
         filename: body.attachment.filename,
         contentType: body.attachment.contentType,
         base64: body.attachment.base64
-      });
+      }, event);
       var host = (event.headers && (event.headers["x-forwarded-host"] || event.headers.host)) || "ipg.team";
       var proto = (event.headers && event.headers["x-forwarded-proto"]) || "https";
       attachmentUrl = proto + "://" + host + "/.netlify/functions/portal-coi-attachment?id=" + encodeURIComponent(saved_attachment.id);
