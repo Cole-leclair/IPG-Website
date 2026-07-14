@@ -3,6 +3,7 @@
   "private": true,
   "description": "ipg.team static site + Netlify Functions backend (portal API). No build step for the frontend; this file exists only to declare function dependencies for Netlify's esbuild bundler.",
   "dependencies": {
-    "@neondatabase/serverless": "^1.1.0"
+    "@neondatabase/serverless": "^1.1.0",
+    "@netlify/blobs": "^10.7.9"
   }
 }

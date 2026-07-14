@@ -958,16 +958,52 @@
     var coiModal = $("coiRequestModal");
     var coiForm = $("coiRequestForm");
     var coiMsg = $("coiRequestMsg");
+    var coiFile = $("crFile");
+    var coiFileName = $("crFileName");
     var pendingCoi = null; // { data, description } captured from the main form
+
+    // Bindly has no attachment field on coi-requests, so a selected file is
+    // uploaded to our own storage (portal-coi-attachment.js) and its link
+    // gets folded into the notes text on submit — see the ALLOWED map below,
+    // which mirrors utils/attachments.js server-side.
+    var COI_FILE_MAX_BYTES = 4 * 1024 * 1024;
+    var COI_FILE_ALLOWED_TYPES = {
+      "application/pdf": true, "image/jpeg": true, "image/png": true,
+      "application/msword": true,
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document": true
+    };
+    if (coiFile && coiFileName) {
+      coiFile.addEventListener("change", function () {
+        var f = coiFile.files && coiFile.files[0];
+        coiFileName.textContent = f ? f.name : "";
+      });
+    }
+    function readFileAsBase64(file) {
+      return new Promise(function (resolve, reject) {
+        var reader = new FileReader();
+        reader.onload = function () {
+          var result = String(reader.result || "");
+          var comma = result.indexOf(",");
+          resolve(comma === -1 ? "" : result.slice(comma + 1));
+        };
+        reader.onerror = function () { reject(new Error("couldn’t read that file")); };
+        reader.readAsDataURL(file);
+      });
+    }
 
     function openCoiModal(data, description) {
       pendingCoi = { data: data, description: description };
       if (coiForm) coiForm.reset();
+      if (coiFileName) coiFileName.textContent = "";
       if (coiMsg) { coiMsg.className = "portal-msg"; coiMsg.textContent = ""; }
       if (coiModal) coiModal.hidden = false;
       var email = $("crEmail"); if (email) email.focus();
     }
-    function closeCoiModal() { if (coiModal) coiModal.hidden = true; pendingCoi = null; }
+    function closeCoiModal() {
+      if (coiModal) coiModal.hidden = true;
+      if (coiFileName) coiFileName.textContent = "";
+      pendingCoi = null;
+    }
 
     if (coiModal) {
       coiModal.addEventListener("click", function (e) {
@@ -982,6 +1018,17 @@
         e.preventDefault();
         if (!pendingCoi) return;
         if (!coiForm.checkValidity()) { coiForm.reportValidity(); return; }
+        var file = coiFile && coiFile.files && coiFile.files[0];
+        if (file && !COI_FILE_ALLOWED_TYPES[file.type]) {
+          coiMsg.className = "portal-msg err";
+          coiMsg.textContent = "Please attach a PDF, Word document, or image (jpg/png).";
+          return;
+        }
+        if (file && file.size > COI_FILE_MAX_BYTES) {
+          coiMsg.className = "portal-msg err";
+          coiMsg.textContent = "That file is too large — please keep attachments under 4MB.";
+          return;
+        }
         var payload = {
           name: pendingCoi.data.name, address1: pendingCoi.data.address1,
           address2: pendingCoi.data.address2, city: pendingCoi.data.city,
@@ -992,7 +1039,11 @@
         };
         var btn = coiForm.querySelector('button[type="submit"]');
         if (btn) { btn.disabled = true; btn.textContent = "Submitting…"; }
-        PortalData.requestCoi(payload).then(function (res) {
+        (file ? readFileAsBase64(file).then(function (base64) {
+          payload.attachment = { filename: file.name, contentType: file.type, base64: base64 };
+        }) : Promise.resolve()).then(function () {
+          return PortalData.requestCoi(payload);
+        }).then(function (res) {
           if (res && res.ok) {
             state.holders.unshift(res.holder);
             renderHolders(); updateStats();

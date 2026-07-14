@@ -13,12 +13,18 @@
 // own cert_holders table (see utils/coi-requests.js) so portal-cert-holders.js
 // can show it as "Pending review" until Bindly's delivery_status flips to
 // "sent" (checked fresh each time the holder list loads).
+//
+// Optional client attachment (e.g. their own insurance requirements doc):
+// Bindly's API has no attachment field, so we host the file ourselves
+// (utils/attachments.js, Netlify Blobs) and append a link to it in the
+// notes text the agent sees on the ticket.
 var auth = require("./utils/auth");
 var bindly = require("./utils/bindly");
 var respond = require("./utils/respond");
 var audit = require("./utils/audit");
 var ratelimit = require("./utils/ratelimit");
 var coiRequests = require("./utils/coi-requests");
+var attachments = require("./utils/attachments");
 
 var LIMITS = {
   holder_name: 200, address1: 120, address2: 120, city: 80, state: 20, zip: 20,
@@ -72,6 +78,23 @@ exports.handler = async function (event) {
     if (!description) return respond.json(400, { error: "description of operations is required" });
     if (!/^\S+@\S+\.\S+$/.test(email)) return respond.json(400, { error: "a valid email is required" });
 
+    // Optional attachment — save it FIRST so a bad file fails fast with a
+    // clear error instead of creating a ticket the client thinks failed.
+    var attachmentUrl = "";
+    if (body.attachment && body.attachment.base64) {
+      var saved_attachment = await attachments.save({
+        filename: body.attachment.filename,
+        contentType: body.attachment.contentType,
+        base64: body.attachment.base64
+      });
+      var host = (event.headers && (event.headers["x-forwarded-host"] || event.headers.host)) || "ipg.team";
+      var proto = (event.headers && event.headers["x-forwarded-proto"]) || "https";
+      attachmentUrl = proto + "://" + host + "/.netlify/functions/portal-coi-attachment?id=" + encodeURIComponent(saved_attachment.id);
+    }
+    var notesWithAttachment = attachmentUrl
+      ? (notes ? notes + "\n\n" : "") + "Client attached a document: " + attachmentUrl
+      : notes;
+
     var created;
     try {
       created = await bindly.createCoiRequest(ctx.bindlyClientId, {
@@ -83,7 +106,7 @@ exports.handler = async function (event) {
         zip: fields.zip,
         desc_ops: description,
         delivery_email: email,
-        notes: notes,
+        notes: notesWithAttachment,
         requested_by: ctx.authUserId
       });
     } catch (err) {
@@ -113,7 +136,8 @@ exports.handler = async function (event) {
     }
 
     await audit.log({
-      action: "coi_request_created", actor: ctx.authUserId,
+      action: attachmentUrl ? "coi_request_created_with_attachment" : "coi_request_created",
+      actor: ctx.authUserId,
       bindlyClientId: ctx.bindlyClientId, target: fields.holder_name, event: event
     });
 

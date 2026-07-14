@@ -516,6 +516,14 @@
           <form id="coiRequestForm" novalidate>
             <div class="form-field full"><label for="crEmail">Send the approved certificate to</label><input id="crEmail" type="email" maxlength="254" required></div>
             <div class="form-field full"><label for="crNotes">Additional notes <span class="lbl-hint">(optional)</span></label><textarea id="crNotes" rows="3" maxlength="1000"></textarea></div>
+            <div class="form-field full">
+              <label for="crFile">Attach a document <span class="lbl-hint">(optional — e.g. your insurance requirements, PDF/Word/image, up to 4MB)</span></label>
+              <input class="upload-input" id="crFile" type="file" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx">
+              <div class="upload-row">
+                <label class="upload-btn" for="crFile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V4"/><path d="M8 8l4-4 4 4"/><path d="M4 14v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg>Upload</label>
+                <span class="upload-name" id="crFileName"></span>
+              </div>
+            </div>
             <div class="invite-confirm-actions" style="margin-top:8px;">
               <button class="btn btn-primary btn-sm" type="submit">Submit request</button>
               <button class="btn btn-outline btn-sm" type="button" data-close-coi>Cancel</button>
@@ -727,6 +735,6 @@
   </main>
 </div>
 
-<script src="portal.js?v=55"></script>
+<script src="portal.js?v=56"></script>
 </body>
 </html>
